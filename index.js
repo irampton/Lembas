@@ -6,12 +6,12 @@ import crypto from "node:crypto";
 import { Server } from "socket.io";
 import { fileURLToPath } from "node:url";
 import { buildRecipeFromText } from "./LLM.js";
+import { deleteRecipe, getRecipes, saveRecipe } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 3000;
-const DATA_FILE = path.join(__dirname, "recipes-data.json");
 
 const app = express();
 const server = http.createServer(app);
@@ -23,37 +23,6 @@ app.use(express.json());
 
 const distDir = path.resolve(__dirname, "dist");
 const indexHtmlPath = path.join(distDir, "index.html");
-
-const ensureDataFile = () => {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf8");
-  }
-};
-
-const readRecipes = () => {
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(DATA_FILE, "utf8");
-    const parsed = JSON.parse(raw || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("[data] Failed to read recipes file:", error);
-    return [];
-  }
-};
-
-const writeRecipes = (recipes) => {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(recipes, null, 2), "utf8");
-  } catch (error) {
-    console.error("[data] Failed to write recipes file:", error);
-  }
-};
-
-const sortByTitle = (list) =>
-  [...list].sort((a, b) => (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" }));
-
-let recipes = sortByTitle(readRecipes());
 
 const normalizeRecipe = (incoming) => {
   const now = new Date().toISOString();
@@ -73,6 +42,9 @@ const normalizeRecipe = (incoming) => {
       unit: item.unit || "",
     })),
     steps: (incoming.steps || []).map((step) => step?.trim()).filter(Boolean),
+    ownerId: incoming.ownerId?.trim?.() || incoming.ownerID?.trim?.() || "",
+    isPublic: Boolean(incoming.isPublic),
+    notes: incoming.notes?.trim?.() || "",
   };
 };
 
@@ -99,11 +71,12 @@ app.post("/api/llm-import", async (req, res) => {
 });
 
 io.on("connection", (socket) => {
+  const recipes = getRecipes();
   socket.emit("recipes:updated", recipes);
 
   socket.on("recipes:list", (ack) => {
     if (typeof ack === "function") {
-      ack({ success: true, data: recipes });
+      ack({ success: true, data: getRecipes() });
     }
   });
 
@@ -117,19 +90,11 @@ io.on("connection", (socket) => {
     }
 
     const normalized = normalizeRecipe(incoming);
-    const existingIndex = recipes.findIndex((r) => r.id === normalized.id);
+    const saved = saveRecipe(normalized);
+    const updatedList = getRecipes();
 
-    if (existingIndex >= 0) {
-      recipes[existingIndex] = { ...recipes[existingIndex], ...normalized };
-    } else {
-      recipes.push(normalized);
-    }
-
-    recipes = sortByTitle(recipes);
-    writeRecipes(recipes);
-
-    io.emit("recipes:updated", recipes);
-    reply({ success: true, data: normalized });
+    io.emit("recipes:updated", updatedList);
+    reply({ success: true, data: saved });
   });
 
   socket.on("recipe:delete", (id, ack) => {
@@ -138,14 +103,13 @@ io.on("connection", (socket) => {
       reply({ success: false, error: "Missing recipe id." });
       return;
     }
-    const idx = recipes.findIndex((r) => r.id === id);
-    if (idx === -1) {
+    const removed = deleteRecipe(id);
+    if (!removed) {
       reply({ success: false, error: "Recipe not found." });
       return;
     }
-    recipes.splice(idx, 1);
-    writeRecipes(recipes);
-    io.emit("recipes:updated", recipes);
+    const updatedList = getRecipes();
+    io.emit("recipes:updated", updatedList);
     reply({ success: true });
   });
 });
