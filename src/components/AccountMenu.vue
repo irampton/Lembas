@@ -1,26 +1,33 @@
 <template>
-<div class="fixed right-4 top-4 z-50">
-    <div class="w-64 rounded-2xl bg-white/90 p-3 shadow-xl shadow-slate-200 ring-1 ring-slate-200 backdrop-blur">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="text-sm font-semibold text-slate-900">{{ user.username }}</p>
-        </div>
-        <button
-          class="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-          type="button"
-          @click="open = !open"
-        >
-          <span class="sr-only">Toggle account menu</span>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+  <div class="relative" data-account-menu>
+    <button
+      class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-orange-200 hover:text-orange-700"
+      type="button"
+      @click="open = !open"
+    >
+      <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-xs font-bold uppercase text-white">
+        {{ user.username?.slice(0, 2) || '?' }}
+      </span>
+      <span class="hidden sm:inline">{{ user.username }}</span>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+
+    <div
+      v-if="open"
+      class="absolute right-0 mt-2 w-64 rounded-2xl bg-white p-3 shadow-xl shadow-slate-200 ring-1 ring-slate-200"
+    >
+      <div class="mb-2">
+        <p class="text-sm font-semibold text-slate-900">{{ user.username }}</p>
+        <p class="text-xs uppercase tracking-[0.15em] text-orange-600">{{ user.role }}</p>
       </div>
-      <div v-if="open" class="mt-3 space-y-2">
+      <div class="space-y-2">
         <RouterLink
           v-if="canManageUsers"
           :to="{ name: 'admin' }"
           class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:-translate-y-[1px] hover:border-orange-300 hover:bg-orange-50"
+          @click="open = false"
         >
           Admin dashboard
           <span class="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white">Staff</span>
@@ -41,7 +48,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/authStore';
 
@@ -54,6 +61,21 @@ const canManageUsers = computed(() => ['owner', 'admin'].includes(user.value.rol
 
 const handleLogout = async () => {
   await auth.logout();
+  open.value = false;
   router.push({ name: 'login' });
 };
+
+const handleClickOutside = (event) => {
+  if (!(event.target.closest && event.target.closest('[data-account-menu]'))) {
+    open.value = false;
+  }
+};
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
 </script>

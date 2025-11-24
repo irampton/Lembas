@@ -1,6 +1,6 @@
 <template>
   <div class="relative min-h-screen bg-slate-50 text-slate-900">
-    <AccountMenu v-if="auth.state.user" />
+    <NavBar v-if="auth.state.user" :show-account="!!auth.state.user" @go-home="goHome" />
     <div v-if="showAppShell" class="grid min-h-screen md:grid-cols-[320px_1fr]">
       <RecipeSidebar
         :recipes="recipes"
@@ -24,7 +24,7 @@
 import { computed, onMounted, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import RecipeSidebar from './components/RecipeSidebar.vue';
-import AccountMenu from './components/AccountMenu.vue';
+import NavBar from './components/NavBar.vue';
 import { useRecipeStore } from './stores/recipeStore';
 import { useAuthStore } from './stores/authStore';
 
