@@ -1,9 +1,12 @@
 ﻿<template>
   <aside class="border-b border-slate-200 bg-white/90 backdrop-blur md:border-b-0 md:border-r">
     <div class="flex items-center justify-between border-b border-slate-200 px-4 py-4 md:h-20 md:py-0">
-      <button type="button" class="flex flex-col text-left" @click="$emit('go-home')" title="Home">
-        <span class="text-sm font-semibold text-slate-900">Lembas</span>
-        <span class="text-xs text-slate-500">Recipies worth sharing</span>
+      <button type="button" class="flex items-center gap-3 text-left" @click="$emit('go-home')" title="Home">
+        <img src="/lembas.png" alt="Lembas logo" class="h-12 w-12 rounded-2xl object-cover" />
+        <span class="flex flex-col">
+          <span class="text-sm font-semibold text-slate-900">Lembas</span>
+          <span class="text-xs text-slate-500">Recipies worth sharing</span>
+        </span>
       </button>
       <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
         <button

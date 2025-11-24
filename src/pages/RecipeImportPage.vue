@@ -67,12 +67,12 @@
         <p class="text-sm text-slate-600">We will return to the create form with the extracted details filled in.</p>
         <button
           type="submit"
-          class="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
-          :disabled="loading"
-        >
-          <svg v-if="!loading" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 5l7 7-7 7-7-7 7-7z" />
-          </svg>
+        class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+        :disabled="loading"
+      >
+        <svg v-if="!loading" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 5l7 7-7 7-7-7 7-7z" />
+        </svg>
           <svg v-else class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <circle cx="12" cy="12" r="10" stroke-width="1.5" class="opacity-25" />
             <path d="M12 2a10 10 0 0110 10" stroke-width="1.5" stroke-linecap="round" class="opacity-75" />

@@ -1,0 +1,16 @@
+{
+  "name": "Lembas",
+  "short_name": "Lembas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff5eb",
+  "theme_color": "#e16b1b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/lembas.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}
