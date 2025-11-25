@@ -1,6 +1,4 @@
 import crypto from "node:crypto";
-
-const LLM_ENDPOINT = "https://dev.aqanta.com/v1/chat/completions";
 const MODEL = "GPT-OSS-20B";
 
 const SYSTEM_PROMPT = `You are a careful recipe extraction assistant.
@@ -159,9 +157,12 @@ const normalizeRecipe = (payload) => {
   };
 };
 
-export const buildRecipeFromText = async (text) => {
+export const buildRecipeFromText = async (text, { endpoint } = {}) => {
   if (!text?.trim()) throw new Error("No text provided for import.");
-  const response = await fetch(LLM_ENDPOINT, {
+  const targetEndpoint = (endpoint || "").trim();
+  if (!targetEndpoint) throw new Error("LLM endpoint not configured.");
+
+  const response = await fetch(targetEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

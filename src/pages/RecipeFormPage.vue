@@ -9,7 +9,7 @@
         </div>
         <div class="flex gap-3">
           <RouterLink
-            v-if="!isEditing"
+            v-if="!isEditing && llmAvailable"
             :to="{ name: 'recipe-import' }"
             class="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700"
           >
@@ -230,11 +230,13 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useRecipeStore } from '../stores/recipeStore';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const store = useRecipeStore();
+const settingsStore = useSettingsStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -263,6 +265,7 @@ const isSaving = ref(false);
 const currentRecipe = computed(() => store.getRecipeById(route.params.id));
 const isEditing = computed(() => Boolean(route.params.id));
 const units = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'oz', 'ml', 'l', 'piece', 'pinch'];
+const llmAvailable = computed(() => settingsStore.isLlmEnabled());
 
 const applyDraft = (data, { replaceExisting = false } = {}) => {
   if (!data) return;
@@ -379,4 +382,8 @@ const save = async () => {
     isSaving.value = false;
   }
 };
+
+onMounted(() => {
+  settingsStore.loadSettings();
+});
 </script>

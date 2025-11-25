@@ -2,7 +2,9 @@
   <div class="relative min-h-screen bg-slate-50 text-slate-900">
     <NavBar v-if="auth.state.user" :show-account="!!auth.state.user" @go-home="goHome" />
     <div v-if="showAppShell" class="grid min-h-screen md:grid-cols-[320px_1fr]">
+      <AdminSidebar v-if="isAdminRoute" />
       <RecipeSidebar
+        v-else
         :recipes="recipes"
         :loading="store.state.loading && !store.state.ready"
         :active-id="activeId"
@@ -25,17 +27,21 @@ import { computed, onMounted, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import RecipeSidebar from './components/RecipeSidebar.vue';
 import NavBar from './components/NavBar.vue';
+import AdminSidebar from './components/AdminSidebar.vue';
 import { useRecipeStore } from './stores/recipeStore';
 import { useAuthStore } from './stores/authStore';
+import { useSettingsStore } from './stores/settingsStore';
 
 const store = useRecipeStore();
 const auth = useAuthStore();
+const settingsStore = useSettingsStore();
 const route = useRoute();
 const router = useRouter();
 
 const recipes = computed(() => store.state.recipes);
 const activeId = computed(() => route.params.id);
 const authRoutes = computed(() => ['login', 'signup']);
+const isAdminRoute = computed(() => Boolean(route.meta?.isAdminPage));
 const showAppShell = computed(() => auth.state.user && !authRoutes.value.includes(route.name));
 
 watch(
@@ -43,8 +49,10 @@ watch(
   (user) => {
     if (user) {
       store.loadRecipes();
+      settingsStore.loadSettings();
     } else {
       store.reset();
+      settingsStore.reset();
     }
   },
   { immediate: true }
@@ -54,6 +62,7 @@ onMounted(async () => {
   await auth.ensureReady();
   if (auth.state.user) {
     store.loadRecipes();
+    settingsStore.loadSettings();
   } else if (!authRoutes.value.includes(route.name)) {
     router.replace({ name: 'login', query: { redirect: route.fullPath } });
   }

@@ -14,6 +14,19 @@
       </RouterLink>
     </div>
 
+    <div
+      v-if="settingsLoading"
+      class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+    >
+      Checking LLM import availability…
+    </div>
+    <div
+      v-else-if="settingsReady && !llmAvailable"
+      class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+    >
+      LLM import is currently disabled or not configured. Ask an admin to enable it in Server settings.
+    </div>
+
     <form @submit.prevent="submit" class="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
       <div class="flex items-center justify-between">
         <div>
@@ -36,7 +49,7 @@
           rows="12"
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-slate-900 shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
           placeholder="Paste any recipe text, article, or notes here..."
-          :disabled="loading"
+          :disabled="loading || !llmAvailable || !settingsReady"
         ></textarea>
       </label>
 
@@ -68,7 +81,7 @@
         <button
           type="submit"
         class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-        :disabled="loading"
+        :disabled="loading || !llmAvailable || !settingsReady"
       >
         <svg v-if="!loading" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 5l7 7-7 7-7-7 7-7z" />
@@ -85,19 +98,34 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { importRecipeFromText } from '../services/importer';
 import { useRecipeStore } from '../stores/recipeStore';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const router = useRouter();
 const store = useRecipeStore();
+const settingsStore = useSettingsStore();
 
 const text = ref('');
 const loading = ref(false);
 const error = ref(null);
+const llmAvailable = computed(() => settingsStore.isLlmEnabled());
+const settingsReady = computed(() => settingsStore.state.ready);
+const settingsLoading = computed(() => settingsStore.state.loading && !settingsStore.state.ready);
 
 const submit = async () => {
+  if (!settingsReady.value) {
+    error.value = 'Still loading settings. Please try again.';
+    return;
+  }
+
+  if (!llmAvailable.value) {
+    error.value = 'LLM import is disabled right now.';
+    return;
+  }
+
   if (!text.value.trim()) {
     error.value = 'Please paste some recipe text first.';
     return;
@@ -116,4 +144,8 @@ const submit = async () => {
     loading.value = false;
   }
 };
+
+onMounted(() => {
+  settingsStore.loadSettings();
+});
 </script>

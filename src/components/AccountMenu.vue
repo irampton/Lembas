@@ -25,12 +25,19 @@
       <div class="space-y-2">
         <RouterLink
           v-if="canManageUsers"
-          :to="{ name: 'admin' }"
+          :to="{ name: 'admin-users' }"
           class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:-translate-y-[1px] hover:border-orange-300 hover:bg-orange-50"
           @click="open = false"
         >
           Admin dashboard
-          <span class="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white">Staff</span>
+        </RouterLink>
+        <RouterLink
+          v-if="isOwner"
+          :to="{ name: 'admin-server-settings' }"
+          class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:-translate-y-[1px] hover:border-orange-300 hover:bg-orange-50"
+          @click="open = false"
+        >
+          Server settings
         </RouterLink>
         <button
           class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-100"
@@ -58,6 +65,7 @@ const open = ref(false);
 
 const user = computed(() => auth.state.user || {});
 const canManageUsers = computed(() => ['owner', 'admin'].includes(user.value.role));
+const isOwner = computed(() => user.value.role === 'owner');
 
 const handleLogout = async () => {
   await auth.logout();

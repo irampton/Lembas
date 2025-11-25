@@ -3,7 +3,7 @@
     <div class="flex items-start justify-between gap-4">
       <div>
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Admin</p>
-        <h1 class="text-2xl font-semibold text-slate-900">Team & access</h1>
+        <h1 class="text-2xl font-semibold text-slate-900">Users</h1>
         <p class="text-sm text-slate-600">Manage users, roles, and issue join codes.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -126,7 +126,7 @@
 
 <script setup>
 import { computed, onMounted, reactive } from 'vue';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '../../stores/authStore';
 
 const auth = useAuthStore();
 const state = reactive({

@@ -50,11 +50,27 @@ const normalizeRecipe = (incoming) => {
   };
 };
 
+const getLlmSettings = () => {
+  const raw = db.getSetting("llm", null) || {};
+  return {
+    enabled: Boolean(raw.enabled),
+    endpoint: (raw.endpoint || "").trim(),
+  };
+};
+
+const bootstrapLlmSettingsFromEnv = () => {
+  const envEndpoint = (process.env.LLM_ENDPOINT || "").trim();
+  if (!envEndpoint) return;
+  db.setSetting("llm", { enabled: true, endpoint: envEndpoint });
+};
+
 if (!fs.existsSync(indexHtmlPath)) {
   console.warn("Vite build not found. Run `npm run build` to generate client assets.");
 }
 
 app.use(express.static(distDir));
+
+bootstrapLlmSettingsFromEnv();
 
 app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
   const { text } = req.body || {};
@@ -63,13 +79,33 @@ app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
     return;
   }
 
+  const llmSettings = getLlmSettings();
+  if (!llmSettings.enabled || !llmSettings.endpoint) {
+    res.status(400).json({ success: false, error: "LLM import is disabled." });
+    return;
+  }
+
   try {
-    const recipe = await buildRecipeFromText(text);
+    const recipe = await buildRecipeFromText(text, { endpoint: llmSettings.endpoint });
     res.json({ success: true, data: recipe });
   } catch (error) {
     console.error("[llm] import failed:", error);
     res.status(500).json({ success: false, error: "Unable to import recipe right now." });
   }
+});
+
+app.get("/api/settings", auth.requireAuth, (req, res) => {
+  res.json({ success: true, settings: { llm: getLlmSettings() } });
+});
+
+app.put("/api/admin/settings/llm", auth.requireAdmin, (req, res) => {
+  const { enabled, endpoint } = req.body || {};
+  const normalized = {
+    enabled: Boolean(enabled),
+    endpoint: (endpoint || "").trim(),
+  };
+  db.setSetting("llm", normalized);
+  res.json({ success: true, settings: { llm: normalized } });
 });
 
 app.post("/api/signup", auth.signupHandler);

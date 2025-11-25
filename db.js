@@ -42,6 +42,12 @@ db.exec(`
     usedCount INTEGER DEFAULT 0
   );
 
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS recipes (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -85,6 +91,38 @@ const parseJson = (value, fallback) => {
   } catch {
     return fallback;
   }
+};
+
+export const getSetting = (key, fallback = null) => {
+  if (!key) return fallback;
+  const stmt = db.prepare("SELECT value FROM settings WHERE key = ?");
+  const row = stmt.get(key);
+  if (!row) return fallback;
+  return parseJson(row.value, fallback);
+};
+
+export const setSetting = (key, value) => {
+  if (!key) return null;
+  const stmt = db.prepare(
+    "INSERT INTO settings (key, value, updatedAt) VALUES (@key, @value, @updatedAt) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt"
+  );
+  const payload = {
+    key,
+    value: JSON.stringify(value ?? null),
+    updatedAt: new Date().toISOString(),
+  };
+  stmt.run(payload);
+  return getSetting(key, null);
+};
+
+export const getAllSettings = () => {
+  const stmt = db.prepare("SELECT key, value FROM settings");
+  const rows = stmt.all();
+  const settings = {};
+  rows.forEach((row) => {
+    settings[row.key] = parseJson(row.value, null);
+  });
+  return settings;
 };
 
 const rowToRecipe = (row) => ({
