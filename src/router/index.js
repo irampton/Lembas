@@ -47,18 +47,4 @@ const router = createRouter({
   },
 });
 
-router.beforeEach(async (to, from, next) => {
-  const auth = useAuthStore();
-  await auth.ensureReady();
-  if (to.meta?.requiresAuth && !auth.state.user) {
-    next({ name: 'login', query: { redirect: to.fullPath } });
-    return;
-  }
-  if (to.meta?.requiresAdmin && !auth.canManageUsers()) {
-    next({ name: 'home' });
-    return;
-  }
-  next();
-});
-
 export default router;
