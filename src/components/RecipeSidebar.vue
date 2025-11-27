@@ -29,13 +29,38 @@
       </div>
 
       <div v-else class="space-y-3">
-        <div class="space-y-1">
-          <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            <span>Your recipes</span>
-            <span class="text-slate-400">{{ filteredOwned.length }}</span>
-          </div>
-          <ul class="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <li v-for="recipe in filteredOwned" :key="recipe.id">
+        <div v-for="group in visibleOwned" :key="group.cookbook.id" class="rounded-xl border border-slate-200 bg-white shadow-sm" :style="accentStyle(group.cookbook)">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-orange-200"
+            @click="$emit('open-cookbook', group.cookbook)"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="h-2.5 w-2.5 rounded-full"
+                :style="{ backgroundColor: group.cookbook.color || '#fb923c' }"
+              ></span>
+              <span class="truncate">{{ group.cookbook.name }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-400">{{ group.recipes.length }}</span>
+              <button
+                type="button"
+                class="rounded-full p-1 text-slate-400 transition hover:text-orange-700"
+                @click.stop="toggleCollapsed(group.cookbook.id)"
+              >
+                <ChevronDownIcon
+                  class="h-4 w-4 transition"
+                  :class="{ 'rotate-180': isCollapsed(group.cookbook.id) }"
+                />
+              </button>
+            </div>
+          </button>
+          <ul
+            v-if="!isCollapsed(group.cookbook.id)"
+            class="divide-y divide-slate-200 border-t border-slate-200"
+          >
+            <li v-for="recipe in group.recipes" :key="recipe.id">
               <RouterLink
                 :to="{ name: 'recipe-detail', params: { id: recipe.id } }"
                 class="flex items-center gap-2 px-3 py-3 text-sm transition hover:bg-orange-50"
@@ -44,7 +69,50 @@
                 <span class="truncate whitespace-nowrap">{{ recipe.title }}</span>
               </RouterLink>
             </li>
-            <li v-if="!filteredOwned.length" class="px-3 py-2 text-xs text-slate-500">No matches.</li>
+            <li v-if="!group.recipes.length" class="px-3 py-3 text-xs text-slate-500">No recipes yet.</li>
+          </ul>
+        </div>
+
+        <div v-for="group in visibleSharedCookbooks" :key="group.cookbook.id" class="rounded-xl border border-slate-200 bg-white shadow-sm" :style="accentStyle(group.cookbook)">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-orange-200"
+            @click="$emit('open-cookbook', group.cookbook)"
+          >
+            <div class="flex items-center gap-2">
+              <UserGroupIcon class="h-4 w-4 text-slate-400" />
+              <span class="truncate">{{ group.cookbook.name }}</span>
+              <EyeIcon v-if="!group.cookbook.canEdit" class="h-4 w-4 text-slate-400" />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-400">{{ group.recipes.length }}</span>
+              <button
+                type="button"
+                class="rounded-full p-1 text-slate-400 transition hover:text-orange-700"
+                @click.stop="toggleCollapsed(group.cookbook.id)"
+              >
+                <ChevronDownIcon
+                  class="h-4 w-4 transition"
+                  :class="{ 'rotate-180': isCollapsed(group.cookbook.id) }"
+                />
+              </button>
+            </div>
+          </button>
+          <ul
+            v-if="!isCollapsed(group.cookbook.id)"
+            class="divide-y divide-slate-200 border-t border-slate-200"
+          >
+            <li v-for="recipe in group.recipes" :key="recipe.id">
+              <RouterLink
+                :to="{ name: 'recipe-detail', params: { id: recipe.id } }"
+                class="flex items-center gap-2 px-3 py-3 text-sm transition hover:bg-orange-50"
+                :class="{ 'bg-orange-50 text-orange-800 font-semibold': activeId === recipe.id }"
+              >
+                <span class="truncate whitespace-nowrap">{{ recipe.title }}</span>
+                <span class="truncate text-xs text-slate-400">• {{ group.cookbook.ownerUsername || 'Shared' }}</span>
+              </RouterLink>
+            </li>
+            <li v-if="!group.recipes.length" class="px-3 py-3 text-xs text-slate-500">No recipes yet.</li>
           </ul>
         </div>
 
@@ -72,12 +140,20 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
-import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
+import { ChevronDownIcon, EyeIcon, MagnifyingGlassIcon, UserGroupIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
   recipes: {
+    type: Array,
+    default: () => [],
+  },
+  cookbooks: {
+    type: Array,
+    default: () => [],
+  },
+  sharedCookbooks: {
     type: Array,
     default: () => [],
   },
@@ -99,18 +175,31 @@ const props = defineProps({
   },
 });
 
-defineEmits(['go-home']);
+defineEmits(['go-home', 'open-cookbook']);
 
 const searchQuery = ref('');
+const collapsed = reactive({});
+
+const cookbookMap = computed(() => {
+  const map = new Map();
+  [...props.cookbooks, ...props.sharedCookbooks].forEach((cb) => {
+    map.set(cb.id, cb);
+  });
+  return map;
+});
 
 const mapWithHaystack = (list) =>
   list.map((recipe) => {
+    const cookbook = cookbookMap.value.get(recipe.cookbookId);
     const parts = [
       recipe.title,
       recipe.description,
       recipe.author,
       recipe.notes,
       recipe.ownerUsername,
+      cookbook?.name,
+      cookbook?.description,
+      cookbook?.ownerUsername,
       ...(recipe.tags || []),
       ...(recipe.ingredients || []).map((item) => `${item.name} ${item.quantity} ${item.unit}`),
       ...(recipe.steps || []),
@@ -122,14 +211,16 @@ const mapWithHaystack = (list) =>
     return { ...recipe, _haystack: parts };
   });
 
-const preparedOwned = computed(() => mapWithHaystack(props.recipes));
+const preparedRecipes = computed(() => mapWithHaystack(props.recipes));
 const preparedShared = computed(() => mapWithHaystack(props.sharedRecipes));
 
-const filteredOwned = computed(() => {
+const searchActive = computed(() => Boolean(searchQuery.value.trim()));
+
+const filteredRecipes = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
   if (!query) return props.recipes;
   const terms = query.split(/\s+/).filter(Boolean);
-  return preparedOwned.value.filter((recipe) => terms.every((term) => recipe._haystack.includes(term)));
+  return preparedRecipes.value.filter((recipe) => terms.every((term) => recipe._haystack.includes(term)));
 });
 
 const filteredShared = computed(() => {
@@ -139,6 +230,67 @@ const filteredShared = computed(() => {
   return preparedShared.value.filter((recipe) => terms.every((term) => recipe._haystack.includes(term)));
 });
 
+const recipesByCookbook = computed(() => {
+  const groups = {};
+  filteredRecipes.value.forEach((recipe) => {
+    const bucket = recipe.cookbookId || 'default';
+    if (!groups[bucket]) groups[bucket] = [];
+    groups[bucket].push(recipe);
+  });
+  return groups;
+});
+
+const visibleOwned = computed(() =>
+  props.cookbooks
+    .map((cb) => ({ cookbook: cb, recipes: recipesByCookbook.value[cb.id] || [] }))
+    .filter((entry) => (searchActive.value ? entry.recipes.length : true))
+);
+
+const visibleSharedCookbooks = computed(() =>
+  props.sharedCookbooks
+    .map((cb) => ({ cookbook: cb, recipes: recipesByCookbook.value[cb.id] || [] }))
+    .filter((entry) => (searchActive.value ? entry.recipes.length : true))
+);
+
 const totalCount = computed(() => props.recipes.length + props.sharedRecipes.length);
-const hasAnyResults = computed(() => filteredOwned.value.length + filteredShared.value.length > 0);
+const hasAnyResults = computed(
+  () => visibleOwned.value.length + visibleSharedCookbooks.value.length + filteredShared.value.length > 0
+);
+
+const isCollapsed = (id) => Boolean(collapsed[id]);
+const toggleCollapsed = (id) => {
+  collapsed[id] = !collapsed[id];
+};
+
+const accentStyle = (cookbook) =>
+  cookbook?.color
+    ? {
+        borderColor: cookbook.color,
+        boxShadow: `0 0 0 1px ${cookbook.color}20`,
+      }
+    : {};
+
+watch(
+  () => props.cookbooks,
+  (list) => {
+    list.forEach((cb) => {
+      if (typeof collapsed[cb.id] === 'undefined') {
+        collapsed[cb.id] = false;
+      }
+    });
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.sharedCookbooks,
+  (list) => {
+    list.forEach((cb) => {
+      if (typeof collapsed[cb.id] === 'undefined') {
+        collapsed[cb.id] = false;
+      }
+    });
+  },
+  { immediate: true }
+);
 </script>

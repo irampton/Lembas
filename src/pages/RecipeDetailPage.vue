@@ -51,7 +51,7 @@
                 <template #default>
                   <span class="truncate">{{ tag }}</span>
                   <button
-                    v-if="!isShareRoute"
+                    v-if="canEditRecipe"
                     type="button"
                     class="hidden h-4 w-4 items-center justify-center rounded-full bg-orange-200 text-orange-800 hover:bg-orange-300 group-hover:flex"
                     @click="removeTag(tag)"
@@ -62,7 +62,7 @@
                 </template>
               </TagPill>
               <button
-                v-if="!isShareRoute"
+                v-if="canEditRecipe"
                 type="button"
                 class="relative inline-flex items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 shadow-sm transition hover:bg-orange-100"
                 title="Add tag"
@@ -107,7 +107,7 @@
             </div>
           </div>
         </div>
-        <div v-if="!isShareRoute" class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+        <div v-if="canEditRecipe" class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
           <button
             type="button"
             class="inline-flex h-10 items-center justify-center px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-orange-700 active:scale-95"
@@ -207,12 +207,7 @@
         @cancel="cancelDelete"
         @confirm="confirmDelete"
       />
-      <ShareDialog
-        v-if="!isShareRoute && recipe"
-        :open="shareDialogOpen"
-        :recipe-id="recipe.id"
-        @close="shareDialogOpen = false"
-      />
+      <ShareDialog v-if="canEditRecipe && recipe" :open="shareDialogOpen" :recipe-id="recipe.id" @close="shareDialogOpen = false" />
     </div>
   </section>
 </template>
@@ -239,6 +234,7 @@ const isShareRoute = computed(() => route.name === 'recipe-share-view');
 const shareToken = computed(() => route.params.token);
 
 const recipe = computed(() => (isShareRoute.value ? sharedRecipe.value : store.getRecipeById(route.params.id)));
+const canEditRecipe = computed(() => !isShareRoute.value && (recipe.value?.canEdit !== false));
 const tagInput = ref('');
 const showTagInput = ref(false);
 const showDeleteConfirm = ref(false);
@@ -316,7 +312,7 @@ const formatUnit = (unit, quantity) => {
 };
 
 const openDeleteDialog = () => {
-  if (isShareRoute.value) return;
+  if (!canEditRecipe.value) return;
   showDeleteConfirm.value = true;
 };
 
@@ -325,7 +321,7 @@ const cancelDelete = () => {
 };
 
 const confirmDelete = async () => {
-  if (!recipe.value) return;
+  if (!recipe.value || !canEditRecipe.value) return;
   deleting.value = true;
   try {
     await store.deleteRecipe(recipe.value.id);
@@ -344,11 +340,12 @@ const editRecipe = () => {
     router.push({ name: 'recipe-share-edit', params: { token: shareToken.value } });
     return;
   }
+  if (!canEditRecipe.value) return;
   router.push({ name: 'recipe-edit', params: { id: recipe.value.id } });
 };
 
 const persistTags = async (tags) => {
-  if (isShareRoute.value) return;
+  if (!canEditRecipe.value) return;
   if (!recipe.value) return;
   try {
     await store.saveRecipe({ ...recipe.value, tags });
@@ -358,6 +355,7 @@ const persistTags = async (tags) => {
 };
 
 const toggleTagInput = () => {
+  if (!canEditRecipe.value) return;
   showTagInput.value = !showTagInput.value;
 };
 
@@ -367,6 +365,7 @@ const closeTagInput = () => {
 };
 
 const confirmTag = () => {
+  if (!canEditRecipe.value) return;
   const value = tagInput.value.trim();
   if (!value || !recipe.value) {
     closeTagInput();
@@ -379,7 +378,7 @@ const confirmTag = () => {
 };
 
 const removeTag = (tag) => {
-  if (isShareRoute.value) return;
+  if (!canEditRecipe.value) return;
   if (!recipe.value) return;
   const tags = (recipe.value.tags || []).filter((t) => t !== tag);
   persistTags(tags);

@@ -55,6 +55,16 @@
         {{ shareError }}
       </div>
       <div class="grid gap-4 md:grid-cols-2">
+        <label v-if="showCookbookSelect" class="col-span-full flex flex-col gap-2">
+          <span class="text-sm font-semibold text-slate-800">Cookbook</span>
+          <CookbookSelect
+            v-model="selectedCookbook"
+            :items="cookbookOptions"
+            placeholder="Choose a cookbook"
+            :disabled="cookbookReadonly"
+          />
+          <span class="text-xs text-slate-500">Recipes live inside a cookbook. Shared cookbooks appear when you can edit them.</span>
+        </label>
         <label class="flex flex-col gap-2">
           <span class="text-sm font-semibold text-slate-800">Title</span>
           <input
@@ -268,11 +278,15 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ArrowDownTrayIcon, CheckIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import UserAutocomplete from '../components/UserAutocomplete.vue';
+import CookbookSelect from '../components/CookbookSelect.vue';
 import { useRecipeStore } from '../stores/recipeStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useAuthStore } from '../stores/authStore';
 
 const store = useRecipeStore();
 const settingsStore = useSettingsStore();
+const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const shareToken = computed(() => route.params.token);
@@ -298,15 +312,29 @@ const form = reactive({
   notes: '',
   servingsQuantity: '',
   servingsUnit: '',
+  cookbookId: '',
 });
 
 const tagInput = ref('');
 const isSaving = ref(false);
 const sharedRecipe = ref(null);
 const shareError = ref(null);
+const selectedCookbook = ref(null);
+const cookbookOptions = computed(() => {
+  const owned = (store.state.cookbooks || []).map((cb) => ({ ...cb, ownerUsername: 'You' }));
+  const editableShared = (store.state.sharedCookbooks || []).filter((cb) => cb.canEdit);
+  return [...owned, ...editableShared];
+});
 
 const currentRecipe = computed(() => (isShareEdit.value ? sharedRecipe.value : store.getRecipeById(route.params.id)));
 const isEditing = computed(() => Boolean(route.params.id) || isShareEdit.value);
+const isShareOwner = computed(() => sharedRecipe.value && auth.state.user?.id === sharedRecipe.value.ownerId);
+const showCookbookSelect = computed(() => !isShareEdit.value || Boolean(isShareOwner.value));
+const cookbookReadonly = computed(() => {
+  if (!isEditing.value) return false;
+  const ownerId = currentRecipe.value?.ownerId || '';
+  return Boolean(ownerId && auth.state.user?.id && ownerId !== auth.state.user.id);
+});
 const units = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'oz', 'ml', 'l', 'piece', 'pinch'];
 const llmAvailable = computed(() => settingsStore.isLlmEnabled());
 
@@ -327,6 +355,7 @@ const applyDraft = (data, { replaceExisting = false } = {}) => {
   setField('notes', data.notes);
   setField('servingsQuantity', data.servingsQuantity);
   setField('servingsUnit', data.servingsUnit);
+  setField('cookbookId', data.cookbookId);
 
   const nextIngredients = (data.ingredients || []).map((item) => ({
     id: item.id || makeId(),
@@ -351,6 +380,7 @@ const applyDraft = (data, { replaceExisting = false } = {}) => {
 const hydrateForm = () => {
   if (!isEditing.value || !currentRecipe.value) return;
   applyDraft(currentRecipe.value, { replaceExisting: true });
+  syncSelectedCookbook(currentRecipe.value.cookbookId);
 };
 
 watch(
@@ -384,6 +414,7 @@ const loadSharedRecipe = async () => {
     if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to load shared recipe.');
     sharedRecipe.value = data.recipe;
     applyDraft(data.recipe, { replaceExisting: true });
+    syncSelectedCookbook(data.recipe.cookbookId);
   } catch (err) {
     shareError.value = err.message || 'Unable to load shared recipe.';
   }
@@ -436,6 +467,7 @@ const buildPayload = () => {
     notes: form.notes,
     servingsQuantity: form.servingsQuantity,
     servingsUnit: form.servingsUnit,
+    cookbookId: form.cookbookId,
   };
 };
 
@@ -474,4 +506,39 @@ onMounted(() => {
   settingsStore.loadSettings();
   loadSharedRecipe();
 });
+
+watch(
+  () => cookbookOptions.value,
+  () => {
+    syncSelectedCookbook(form.cookbookId);
+  },
+  { immediate: true, deep: true }
+);
+
+watch(
+  () => selectedCookbook.value,
+  (cb) => {
+    form.cookbookId = cb?.id || '';
+  }
+);
+
+const syncSelectedCookbook = (cookbookId) => {
+  if (!showCookbookSelect.value) return;
+  const targetId = cookbookId || form.cookbookId;
+  if (targetId && selectedCookbook.value?.id === targetId) return;
+
+  const match = cookbookOptions.value.find((cb) => cb.id === targetId);
+  if (targetId && !match) {
+    // Keep the id around until options load; don't overwrite with blank.
+    return;
+  }
+
+  const fallback =
+    cookbookOptions.value.find((cb) => cb.isDefault) ||
+    cookbookOptions.value[0] ||
+    null;
+
+  selectedCookbook.value = match || fallback;
+  form.cookbookId = selectedCookbook.value?.id || '';
+};
 </script>

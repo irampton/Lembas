@@ -123,6 +123,7 @@ export const signupHandler = async (req, res) => {
     role: codeRecord.role,
     createdAt: now,
   });
+  db.ensureDefaultCookbookForUser(user);
 
   db.markJoinCodeUsed(normalizedCode, id);
   if (codeRecord.role === "owner") {

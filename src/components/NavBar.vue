@@ -24,6 +24,15 @@
               <PlusIcon class="h-4 w-4" />
               <span class="hidden sm:inline">New</span>
             </RouterLink>
+            <button
+              type="button"
+              class="inline-flex h-10 items-center justify-center border-l border-slate-200 px-4 text-xs font-semibold text-slate-700 transition hover:bg-orange-50 hover:text-orange-700"
+              title="Create cookbook"
+              @click="$emit('create-cookbook')"
+            >
+              <PlusIcon class="h-4 w-4" />
+              <span class="hidden sm:inline">Cookbook</span>
+            </button>
           </div>
         </div>
 
@@ -56,7 +65,7 @@ defineProps({
   },
 });
 
-defineEmits(['go-home']);
+defineEmits(['go-home', 'create-cookbook']);
 
 const hidden = ref(false);
 let lastY = 0;

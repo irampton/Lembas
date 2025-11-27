@@ -4,6 +4,8 @@ import socket from '../services/socket';
 const state = reactive({
   recipes: [],
   sharedRecipes: [],
+  cookbooks: [],
+  sharedCookbooks: [],
   loading: false,
   error: null,
   ready: false,
@@ -13,14 +15,24 @@ const state = reactive({
 const sortByTitle = (list) =>
   [...list].sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
 
-socket.on('recipes:updated', (payload) => {
-  state.recipes = sortByTitle(payload || []);
+const sortByName = (list) =>
+  [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+
+const applyLibrary = (payload) => {
+  if (!payload) return;
+  state.recipes = sortByTitle(payload.recipes || []);
+  state.cookbooks = sortByName(payload.cookbooks || []);
+  state.sharedCookbooks = sortByName(payload.sharedCookbooks || []);
   state.ready = true;
+};
+
+socket.on('library:updated', (payload) => {
+  applyLibrary(payload);
 });
 
 socket.on('connect', () => {
   if (!state.ready) {
-    loadRecipes();
+    loadLibrary();
   }
 });
 
@@ -28,7 +40,7 @@ socket.on('disconnect', () => {
   state.ready = false;
 });
 
-const loadRecipes = () => {
+const loadLibrary = () => {
   if (!socket.connected) {
     socket.connect();
   }
@@ -36,10 +48,9 @@ const loadRecipes = () => {
   state.loading = true;
   state.error = null;
 
-  socket.emit('recipes:list', (response) => {
+  socket.emit('library:list', (response) => {
     if (response?.success) {
-      state.recipes = sortByTitle(response.data || []);
-      state.ready = true;
+      applyLibrary(response.data || {});
     } else {
       state.error = response?.error || 'Unable to load recipes.';
     }
@@ -90,18 +101,24 @@ const deleteRecipe = (id) =>
 
 const getRecipeById = (id) => state.recipes.find((recipe) => recipe.id === id);
 const getSharedRecipeById = (id) => state.sharedRecipes.find((recipe) => recipe.id === id);
+const getCookbookById = (id) =>
+  state.cookbooks.find((cb) => cb.id === id) || state.sharedCookbooks.find((cb) => cb.id === id);
 
 export const useRecipeStore = () => ({
   state,
-  loadRecipes,
+  loadRecipes: loadLibrary,
+  loadLibrary,
   loadSharedRecipes,
   saveRecipe,
   deleteRecipe,
   getRecipeById,
   getSharedRecipeById,
+  getCookbookById,
   reset: () => {
     state.recipes = [];
     state.sharedRecipes = [];
+    state.cookbooks = [];
+    state.sharedCookbooks = [];
     state.ready = false;
     state.error = null;
   },

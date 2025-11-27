@@ -88,6 +88,16 @@ const emitFriendUpdate = (userId) => {
   io.to(`user:${userId}`).emit("friends:updated");
 };
 
+const emitLibraryForUser = (userId) => {
+  if (!userId) return;
+  io.to(`user:${userId}`).emit("library:updated", db.getLibraryForUser(userId));
+};
+
+const emitLibraryForCookbookMembers = (cookbookId) => {
+  const members = db.listCookbookMemberIds(cookbookId);
+  members.forEach((memberId) => emitLibraryForUser(memberId));
+};
+
 app.use(express.json({ limit: "10mb" }));
 app.use(auth.attachSession);
 
@@ -119,6 +129,7 @@ const normalizeRecipe = (incoming) => {
     })),
     steps: (incoming.steps || []).map((step) => step?.trim()).filter(Boolean),
     ownerId: incoming.ownerId?.trim?.() || incoming.ownerID?.trim?.() || "",
+    cookbookId: incoming.cookbookId?.trim?.() || "",
     isPublic: Boolean(incoming.isPublic),
     notes: incoming.notes?.trim?.() || "",
     servingsQuantity: servingQuantity,
@@ -147,6 +158,7 @@ if (!fs.existsSync(indexHtmlPath)) {
 app.use(express.static(distDir));
 
 bootstrapLlmSettingsFromEnv();
+db.backfillCookbookAssignments();
 
 app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
   const { text, imageBase64 } = req.body || {};
@@ -379,6 +391,125 @@ app.get("/api/shared-recipes", auth.requireAuth, (req, res) => {
   res.json({ success: true, recipes });
 });
 
+app.get("/api/cookbooks", auth.requireAuth, (req, res) => {
+  const data = db.getLibraryForUser(req.user.id);
+  res.json({ success: true, ...data });
+});
+
+app.post("/api/cookbooks", auth.requireAuth, (req, res) => {
+  const { name, description, color } = req.body || {};
+  if (!name || !name.trim()) {
+    res.status(400).json({ success: false, error: "Name is required." });
+    return;
+  }
+  const cookbook = db.createCookbook({
+    name: name.trim(),
+    description: (description || "").trim(),
+    color: (color || "").trim(),
+    ownerId: req.user.id,
+    isDefault: false,
+  });
+  emitLibraryForUser(req.user.id);
+  res.json({ success: true, cookbook });
+});
+
+app.put("/api/cookbooks/:id", auth.requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { name, description, color } = req.body || {};
+  const cookbook = db.getCookbookById(id);
+  if (!cookbook || cookbook.ownerId !== req.user.id) {
+    res.status(404).json({ success: false, error: "Cookbook not found." });
+    return;
+  }
+  const updated = db.updateCookbook({
+    ...cookbook,
+    name: name?.trim?.() || cookbook.name,
+    description: description?.trim?.() ?? cookbook.description,
+    color: (color || "").trim(),
+  });
+  emitLibraryForCookbookMembers(id);
+  res.json({ success: true, cookbook: updated });
+});
+
+app.get("/api/cookbooks/:id/shares", auth.requireAuth, (req, res) => {
+  const { id } = req.params;
+  const cookbook = db.getCookbookById(id);
+  if (!cookbook || cookbook.ownerId !== req.user.id) {
+    res.status(404).json({ success: false, error: "Cookbook not found." });
+    return;
+  }
+  const shares = db.listSharesForCookbook(id);
+  const userShares = shares.filter((s) => s.type === "user");
+  const filteredShares = userShares.filter((s) => {
+    const stillFriends = db.areFriends(cookbook.ownerId, s.userId);
+    if (!stillFriends) {
+      db.deleteCookbookUserShare(id, s.userId);
+    }
+    return stillFriends;
+  });
+  const withNames = filteredShares.map((s) => {
+    const user = db.findUserById(s.userId);
+    return { ...s, username: user?.username || "Unknown" };
+  });
+  const publicShare = shares.find((s) => s.type === "public") || null;
+  res.json({ success: true, shares: { publicShare, userShares: withNames } });
+});
+
+app.post("/api/cookbooks/:id/share/public", auth.requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { enabled } = req.body || {};
+  const cookbook = db.getCookbookById(id);
+  if (!cookbook || cookbook.ownerId !== req.user.id) {
+    res.status(404).json({ success: false, error: "Cookbook not found." });
+    return;
+  }
+  if (enabled) {
+    const share = db.upsertCookbookPublicShare(id);
+    res.json({ success: true, share });
+  } else {
+    db.removeCookbookPublicShare(id);
+    res.json({ success: true, share: null });
+  }
+});
+
+app.post("/api/cookbooks/:id/share/user", auth.requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { userId, canEdit } = req.body || {};
+  const cookbook = db.getCookbookById(id);
+  if (!cookbook || cookbook.ownerId !== req.user.id) {
+    res.status(404).json({ success: false, error: "Cookbook not found." });
+    return;
+  }
+  if (!userId) {
+    res.status(400).json({ success: false, error: "Missing user id." });
+    return;
+  }
+  const targetUser = db.findUserById(userId);
+  if (!targetUser) {
+    res.status(404).json({ success: false, error: "User not found." });
+    return;
+  }
+  if (!db.areFriends(req.user.id, userId)) {
+    res.status(400).json({ success: false, error: "You can only share cookbooks with friends." });
+    return;
+  }
+  const share = db.upsertCookbookUserShare(id, userId, Boolean(canEdit));
+  emitLibraryForUser(userId);
+  res.json({ success: true, share: { ...share, username: targetUser.username } });
+});
+
+app.delete("/api/cookbooks/:id/share/user/:userId", auth.requireAuth, (req, res) => {
+  const { id, userId } = req.params;
+  const cookbook = db.getCookbookById(id);
+  if (!cookbook || cookbook.ownerId !== req.user.id) {
+    res.status(404).json({ success: false, error: "Cookbook not found." });
+    return;
+  }
+  db.deleteCookbookUserShare(id, userId);
+  emitLibraryForUser(userId);
+  res.json({ success: true });
+});
+
 app.get("/api/users", auth.requireAdmin, (req, res) => {
   res.json({ success: true, users: db.getUsers() });
 });
@@ -498,6 +629,42 @@ app.delete("/api/recipes/:id/share/user/:userId", auth.requireAuth, (req, res) =
   res.json({ success: true });
 });
 
+app.get("/api/cookbook-share/:token", (req, res) => {
+  const { token } = req.params;
+  const share = db.getCookbookShareByToken(token);
+  if (!share) {
+    res.status(404).json({ success: false, error: "Share not found." });
+    return;
+  }
+  const cookbook = db.getCookbookById(share.cookbookId);
+  if (!cookbook) {
+    res.status(404).json({ success: false, error: "Cookbook not found." });
+    return;
+  }
+  const owner = db.findUserById(cookbook.ownerId);
+  if (share.type === "user") {
+    const isOwner = req.user && req.user.id === cookbook.ownerId;
+    const isRecipient = req.user && req.user.id === share.userId;
+    if (!isOwner && !isRecipient) {
+      res.status(403).json({ success: false, error: "Unauthorized to view this cookbook." });
+      return;
+    }
+    if (!isOwner && !db.areFriends(req.user.id, cookbook.ownerId)) {
+      res.status(403).json({ success: false, error: "You must be friends to view this cookbook." });
+      return;
+    }
+  }
+  const recipes = db.getRecipesForCookbookIds([cookbook.id]);
+  res.json({
+    success: true,
+    cookbook: { ...cookbook, ownerUsername: owner?.username || "" },
+    recipes,
+    permissions: {
+      canEdit: share.type === "user" && Boolean(share.canEdit) && req.user && req.user.id === share.userId,
+    },
+  });
+});
+
 app.get("/api/share/:token", async (req, res) => {
   const { token } = req.params;
   const share = db.getShareByToken(token);
@@ -522,9 +689,14 @@ app.get("/api/share/:token", async (req, res) => {
       return;
     }
   }
+  const isOwner = req.user && req.user.id === recipe.ownerId;
+  const responseRecipe = { ...recipe, isPublic: share.type === "public" || recipe.isPublic };
+  if (!isOwner) {
+    responseRecipe.cookbookId = "";
+  }
   res.json({
     success: true,
-    recipe: { ...recipe, isPublic: share.type === "public" || recipe.isPublic },
+    recipe: responseRecipe,
     permissions: {
       canEdit:
         (req.user && req.user.id === recipe.ownerId) ||
@@ -567,6 +739,7 @@ app.put("/api/share/:token", async (req, res) => {
     ...req.body,
     id: recipe.id,
     ownerId: recipe.ownerId,
+    cookbookId: recipe.cookbookId,
     isPublic: recipe.isPublic,
   });
   const saved = db.saveRecipe(normalized);
@@ -640,12 +813,17 @@ io.use(auth.socketAuth);
 io.on("connection", (socket) => {
   const user = socket.data.user;
   socket.join(`user:${user.id}`);
-  const recipes = db.getRecipesForOwner(user.id);
-  socket.emit("recipes:updated", recipes);
+  emitLibraryForUser(user.id);
+
+  socket.on("library:list", (ack) => {
+    if (typeof ack === "function") {
+      ack({ success: true, data: db.getLibraryForUser(user.id) });
+    }
+  });
 
   socket.on("recipes:list", (ack) => {
     if (typeof ack === "function") {
-      ack({ success: true, data: db.getRecipesForOwner(user.id) });
+      ack({ success: true, data: db.getLibraryForUser(user.id) });
     }
   });
 
@@ -659,14 +837,41 @@ io.on("connection", (socket) => {
     }
 
     const normalized = normalizeRecipe(incoming);
-    normalized.ownerId = user.id;
+    const existing = normalized.id ? db.getRecipeByIdAnyOwner(normalized.id) : null;
+    const previousCookbookId = existing?.cookbookId || null;
+    if (existing && previousCookbookId && normalized.cookbookId && previousCookbookId !== normalized.cookbookId) {
+      const canEditPrevious = db.isCookbookEditor(previousCookbookId, user.id);
+      if (!canEditPrevious) {
+        reply({ success: false, error: "You cannot move this recipe out of its current cookbook." });
+        return;
+      }
+    }
+    const incomingCookbookId = normalized.cookbookId || db.getDefaultCookbookForOwner(user.id)?.id;
+    let cookbook = incomingCookbookId ? db.getCookbookById(incomingCookbookId) : null;
+    if (!cookbook) {
+      cookbook = db.ensureDefaultCookbookForUser(user);
+    }
+    if (!cookbook) {
+      reply({ success: false, error: "Cookbook not found." });
+      return;
+    }
+    const canEditCookbook = cookbook.ownerId === user.id || db.isCookbookEditor(cookbook.id, user.id);
+    if (!canEditCookbook) {
+      reply({ success: false, error: "You do not have permission to edit this cookbook." });
+      return;
+    }
+
+    normalized.ownerId = cookbook.ownerId;
+    normalized.cookbookId = cookbook.id;
     if (!normalized.author) {
       normalized.author = user.username || "";
     }
-    const saved = db.saveRecipe(normalized);
-    const updatedList = db.getRecipesForOwner(user.id);
+    const saved = db.saveRecipe(db.ensureRecipeCookbook(normalized));
 
-    socket.emit("recipes:updated", updatedList);
+    emitLibraryForCookbookMembers(cookbook.id);
+    if (previousCookbookId && previousCookbookId !== cookbook.id) {
+      emitLibraryForCookbookMembers(previousCookbookId);
+    }
     reply({ success: true, data: saved });
   });
 
@@ -676,13 +881,22 @@ io.on("connection", (socket) => {
       reply({ success: false, error: "Missing recipe id." });
       return;
     }
-    const removed = db.deleteRecipe(id, user.id);
+    const recipe = db.getRecipeByIdAnyOwner(id);
+    if (!recipe) {
+      reply({ success: false, error: "Recipe not found." });
+      return;
+    }
+    const canEditCookbook = db.isCookbookEditor(recipe.cookbookId, user.id);
+    if (!canEditCookbook) {
+      reply({ success: false, error: "You do not have permission to delete this recipe." });
+      return;
+    }
+    const removed = db.deleteRecipe(id, recipe.ownerId);
     if (!removed) {
       reply({ success: false, error: "Recipe not found." });
       return;
     }
-    const updatedList = db.getRecipesForOwner(user.id);
-    socket.emit("recipes:updated", updatedList);
+    emitLibraryForCookbookMembers(recipe.cookbookId);
     reply({ success: true });
   });
 });

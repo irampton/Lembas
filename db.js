@@ -58,16 +58,45 @@ db.exec(`
     ingredients TEXT DEFAULT '[]',
     steps TEXT DEFAULT '[]',
     ownerId TEXT NOT NULL,
+    cookbookId TEXT,
     isPublic INTEGER DEFAULT 0,
     notes TEXT DEFAULT '',
     servingsQuantity TEXT DEFAULT '',
     servingsUnit TEXT DEFAULT '',
-    FOREIGN KEY (ownerId) REFERENCES users(id)
+    FOREIGN KEY (ownerId) REFERENCES users(id),
+    FOREIGN KEY (cookbookId) REFERENCES cookbooks(id) ON DELETE SET NULL
   );
 
   CREATE INDEX IF NOT EXISTS idx_recipes_owner ON recipes(ownerId);
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(userId);
   CREATE INDEX IF NOT EXISTS idx_join_codes_used ON join_codes(usedBy);
+
+  CREATE TABLE IF NOT EXISTS cookbooks (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    color TEXT DEFAULT '',
+    ownerId TEXT NOT NULL,
+    isDefault INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_cookbooks_owner ON cookbooks(ownerId);
+
+  CREATE TABLE IF NOT EXISTS cookbook_shares (
+    id TEXT PRIMARY KEY,
+    cookbookId TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('public', 'user')),
+    userId TEXT,
+    canEdit INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    FOREIGN KEY (cookbookId) REFERENCES cookbooks(id) ON DELETE CASCADE,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_cookbook_shares_cb ON cookbook_shares(cookbookId);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_public_cookbook_share_unique ON cookbook_shares(cookbookId) WHERE type = 'public';
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_user_cookbook_share_unique ON cookbook_shares(cookbookId, userId) WHERE type = 'user';
 
   CREATE TABLE IF NOT EXISTS recipe_shares (
     id TEXT PRIMARY KEY,
@@ -139,11 +168,30 @@ const parseJson = (value, fallback) => {
 const recipeColumns = db.prepare("PRAGMA table_info('recipes')").all();
 const hasServingsQuantity = recipeColumns.some((col) => col.name === "servingsQuantity");
 const hasServingsUnit = recipeColumns.some((col) => col.name === "servingsUnit");
+const hasCookbookId = recipeColumns.some((col) => col.name === "cookbookId");
 if (!hasServingsQuantity) {
   db.exec("ALTER TABLE recipes ADD COLUMN servingsQuantity TEXT DEFAULT '';");
 }
 if (!hasServingsUnit) {
   db.exec("ALTER TABLE recipes ADD COLUMN servingsUnit TEXT DEFAULT '';");
+}
+if (!hasCookbookId) {
+  db.exec("ALTER TABLE recipes ADD COLUMN cookbookId TEXT;");
+}
+try {
+  const recipeColumnsPost = db.prepare("PRAGMA table_info('recipes')").all();
+  const hasCookbookIdNow = recipeColumnsPost.some((col) => col.name === "cookbookId");
+  if (hasCookbookIdNow) {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_recipes_cookbook ON recipes(cookbookId);");
+  }
+} catch (err) {
+  console.warn("[db] Unable to create cookbook index:", err?.message || err);
+}
+
+const cookbookColumns = db.prepare("PRAGMA table_info('cookbooks')").all();
+const hasCookbookIsDefault = cookbookColumns.some((col) => col.name === "isDefault");
+if (!hasCookbookIsDefault) {
+  db.exec("ALTER TABLE cookbooks ADD COLUMN isDefault INTEGER DEFAULT 0;");
 }
 
 try {
@@ -194,6 +242,7 @@ const rowToRecipe = (row) => ({
   ingredients: parseJson(row.ingredients, []),
   steps: parseJson(row.steps, []),
   ownerId: row.ownerId || "",
+  cookbookId: row.cookbookId || "",
   isPublic: Boolean(row.isPublic),
   notes: row.notes || "",
   servingsQuantity: row.servingsQuantity || "",
@@ -210,16 +259,34 @@ const serializeRecipe = (recipe) => ({
   ingredients: JSON.stringify(recipe.ingredients ?? []),
   steps: JSON.stringify(recipe.steps ?? []),
   ownerId: recipe.ownerId ?? "",
+  cookbookId: recipe.cookbookId ?? "",
   isPublic: recipe.isPublic ? 1 : 0,
   notes: recipe.notes ?? "",
   servingsQuantity: recipe.servingsQuantity ?? "",
   servingsUnit: recipe.servingsUnit ?? "",
 });
 
+const rowToCookbook = (row) => ({
+  id: row.id,
+  name: row.name,
+  description: row.description || "",
+  color: row.color || "",
+  ownerId: row.ownerId || "",
+  isDefault: Boolean(row.isDefault),
+  createdAt: row.createdAt,
+});
+
 export const getRecipesForOwner = (ownerId) => {
   if (!ownerId) return [];
   const stmt = db.prepare("SELECT * FROM recipes WHERE ownerId = ? ORDER BY title COLLATE NOCASE");
   return stmt.all(ownerId).map(rowToRecipe);
+};
+
+export const getRecipesForCookbookIds = (cookbookIds = []) => {
+  if (!cookbookIds.length) return [];
+  const placeholders = cookbookIds.map(() => "?").join(", ");
+  const stmt = db.prepare(`SELECT * FROM recipes WHERE cookbookId IN (${placeholders}) ORDER BY title COLLATE NOCASE`);
+  return stmt.all(...cookbookIds).map(rowToRecipe);
 };
 
 export const getRecipeByIdAnyOwner = (id) => {
@@ -236,8 +303,8 @@ export const getRecipeById = (id, ownerId) => {
 
 export const saveRecipe = (recipe) => {
   const upsertStmt = db.prepare(`
-    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, steps, ownerId, isPublic, notes, servingsQuantity, servingsUnit)
-    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @steps, @ownerId, @isPublic, @notes, @servingsQuantity, @servingsUnit)
+    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, steps, ownerId, isPublic, notes, servingsQuantity, servingsUnit, cookbookId)
+    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @steps, @ownerId, @isPublic, @notes, @servingsQuantity, @servingsUnit, @cookbookId)
     ON CONFLICT(id) DO UPDATE SET
       title=excluded.title,
       description=excluded.description,
@@ -250,7 +317,8 @@ export const saveRecipe = (recipe) => {
       isPublic=excluded.isPublic,
       notes=excluded.notes,
       servingsQuantity=excluded.servingsQuantity,
-      servingsUnit=excluded.servingsUnit
+      servingsUnit=excluded.servingsUnit,
+      cookbookId=excluded.cookbookId
   `);
   upsertStmt.run(serializeRecipe(recipe));
   return getRecipeById(recipe.id, recipe.ownerId);
@@ -260,6 +328,67 @@ export const deleteRecipe = (id, ownerId) => {
   const stmt = db.prepare("DELETE FROM recipes WHERE id = ? AND ownerId = ?");
   const info = stmt.run(id, ownerId);
   return info.changes > 0;
+};
+
+const serializeCookbook = (cookbook) => ({
+  id: cookbook.id,
+  name: cookbook.name,
+  description: cookbook.description ?? "",
+  color: cookbook.color ?? "",
+  ownerId: cookbook.ownerId,
+  isDefault: cookbook.isDefault ? 1 : 0,
+  createdAt: cookbook.createdAt,
+});
+
+export const getCookbookById = (id) => {
+  const stmt = db.prepare("SELECT * FROM cookbooks WHERE id = ?");
+  const row = stmt.get(id);
+  return row ? rowToCookbook(row) : null;
+};
+
+export const listCookbooksForOwner = (ownerId) => {
+  if (!ownerId) return [];
+  const stmt = db.prepare("SELECT * FROM cookbooks WHERE ownerId = ? ORDER BY name COLLATE NOCASE");
+  return stmt.all(ownerId).map(rowToCookbook);
+};
+
+export const getDefaultCookbookForOwner = (ownerId) => {
+  if (!ownerId) return null;
+  const stmt = db.prepare("SELECT * FROM cookbooks WHERE ownerId = ? AND isDefault = 1 LIMIT 1");
+  const row = stmt.get(ownerId);
+  return row ? rowToCookbook(row) : null;
+};
+
+export const createCookbook = ({ id, name, description, color, ownerId, isDefault = false, createdAt }) => {
+  const payload = serializeCookbook({
+    id: id || crypto.randomUUID(),
+    name,
+    description,
+    color,
+    ownerId,
+    isDefault,
+    createdAt: createdAt || new Date().toISOString(),
+  });
+  const stmt = db.prepare(
+    "INSERT INTO cookbooks (id, name, description, color, ownerId, isDefault, createdAt) VALUES (@id, @name, @description, @color, @ownerId, @isDefault, @createdAt)"
+  );
+  stmt.run(payload);
+  return getCookbookById(payload.id);
+};
+
+export const updateCookbook = (cookbook) => {
+  const stmt = db.prepare(
+    "UPDATE cookbooks SET name = @name, description = @description, color = @color WHERE id = @id AND ownerId = @ownerId"
+  );
+  const info = stmt.run({
+    id: cookbook.id,
+    name: cookbook.name,
+    description: cookbook.description ?? "",
+    color: cookbook.color ?? "",
+    ownerId: cookbook.ownerId,
+  });
+  if (!info.changes) return null;
+  return getCookbookById(cookbook.id);
 };
 
 const userColumns = "id, username, role, createdAt, passwordHash";
@@ -290,6 +419,40 @@ export const createUser = ({ id, username, passwordHash, role, createdAt }) => {
   );
   stmt.run({ id, username, passwordHash, role, createdAt });
   return findUserById(id);
+};
+
+export const ensureDefaultCookbookForUser = (user) => {
+  if (!user?.id) return null;
+  const existing = getDefaultCookbookForOwner(user.id);
+  if (existing) return existing;
+  return createCookbook({
+    name: `${user.username}'s Cookbook`,
+    description: "Your personal cookbook",
+    color: "",
+    ownerId: user.id,
+    isDefault: true,
+  });
+};
+
+export const backfillCookbookAssignments = () => {
+  const users = getUsers();
+  users.forEach((user) => {
+    const defaultCb = ensureDefaultCookbookForUser(user);
+    if (!defaultCb) return;
+    db.prepare(
+      "UPDATE recipes SET cookbookId = @cookbookId WHERE (cookbookId IS NULL OR cookbookId = '') AND ownerId = @ownerId"
+    ).run({
+      cookbookId: defaultCb.id,
+      ownerId: user.id,
+    });
+  });
+};
+
+export const ensureRecipeCookbook = (recipe) => {
+  if (recipe.cookbookId) return recipe;
+  const owner = findUserById(recipe.ownerId);
+  const cb = ensureDefaultCookbookForUser(owner);
+  return { ...recipe, cookbookId: cb?.id || recipe.cookbookId };
 };
 
 export const deleteUser = (id) => {
@@ -372,6 +535,72 @@ export const listSharesForRecipe = (recipeId) => {
 
 export const getShareByToken = (token) => {
   const stmt = db.prepare("SELECT * FROM recipe_shares WHERE token = ?");
+  return stmt.get(token) || null;
+};
+
+export const getCookbookPublicShare = (cookbookId) => {
+  const stmt = db.prepare("SELECT * FROM cookbook_shares WHERE cookbookId = ? AND type = 'public' LIMIT 1");
+  return stmt.get(cookbookId) || null;
+};
+
+export const upsertCookbookPublicShare = (cookbookId) => {
+  const existing = getCookbookPublicShare(cookbookId);
+  if (existing) return existing;
+  const payload = {
+    id: crypto.randomUUID(),
+    cookbookId,
+    token: randomToken(),
+    type: "public",
+    userId: null,
+    canEdit: 0,
+    createdAt: new Date().toISOString(),
+  };
+  db.prepare(
+    "INSERT INTO cookbook_shares (id, cookbookId, token, type, userId, canEdit, createdAt) VALUES (@id, @cookbookId, @token, @type, @userId, @canEdit, @createdAt)"
+  ).run(payload);
+  return payload;
+};
+
+export const removeCookbookPublicShare = (cookbookId) => {
+  const stmt = db.prepare("DELETE FROM cookbook_shares WHERE cookbookId = ? AND type = 'public'");
+  stmt.run(cookbookId);
+};
+
+export const upsertCookbookUserShare = (cookbookId, userId, canEdit = false) => {
+  const existing = db
+    .prepare("SELECT * FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'")
+    .get(cookbookId, userId);
+  if (existing) {
+    db.prepare("UPDATE cookbook_shares SET canEdit = ? WHERE id = ?").run(canEdit ? 1 : 0, existing.id);
+    return { ...existing, canEdit: canEdit ? 1 : 0 };
+  }
+  const payload = {
+    id: crypto.randomUUID(),
+    cookbookId,
+    token: randomToken(),
+    type: "user",
+    userId,
+    canEdit: canEdit ? 1 : 0,
+    createdAt: new Date().toISOString(),
+  };
+  db.prepare(
+    "INSERT INTO cookbook_shares (id, cookbookId, token, type, userId, canEdit, createdAt) VALUES (@id, @cookbookId, @token, @type, @userId, @canEdit, @createdAt)"
+  ).run(payload);
+  return payload;
+};
+
+export const deleteCookbookUserShare = (cookbookId, userId) => {
+  const stmt = db.prepare("DELETE FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'");
+  stmt.run(cookbookId, userId);
+};
+
+export const listSharesForCookbook = (cookbookId) => {
+  const stmt = db.prepare("SELECT * FROM cookbook_shares WHERE cookbookId = ? ORDER BY createdAt DESC");
+  return stmt.all(cookbookId) || [];
+};
+
+export const getCookbookShareByToken = (token) => {
+  const stmt = db.prepare("SELECT * FROM cookbook_shares WHERE token = ?");
   return stmt.get(token) || null;
 };
 
@@ -526,6 +755,17 @@ export const deleteSharesBetweenUsers = (userA, userB) => {
     )
   `
   ).run(userA, userB, userB, userA);
+
+  db.prepare(
+    `
+    DELETE FROM cookbook_shares
+    WHERE type = 'user' AND (
+      (cookbookId IN (SELECT id FROM cookbooks WHERE ownerId = ?) AND userId = ?)
+      OR
+      (cookbookId IN (SELECT id FROM cookbooks WHERE ownerId = ?) AND userId = ?)
+    )
+  `
+  ).run(userA, userB, userB, userA);
 };
 
 export const listSharedRecipesForUser = (userId) => {
@@ -551,6 +791,65 @@ export const listSharedRecipesForUser = (userId) => {
     sharedAt: row.sharedAt,
     ownerUsername: row.ownerUsername || "",
   }));
+};
+
+export const listSharedCookbooksForUser = (userId) => {
+  if (!userId) return [];
+  const stmt = db.prepare(`
+    SELECT cs.id as shareId, cs.token, cs.canEdit, cs.createdAt as sharedAt, cs.type,
+           cb.*, u.username as ownerUsername
+    FROM cookbook_shares cs
+    JOIN cookbooks cb ON cb.id = cs.cookbookId
+    JOIN users u ON u.id = cb.ownerId
+    WHERE cs.type = 'user' AND cs.userId = ?
+    ORDER BY cb.name COLLATE NOCASE
+  `);
+  const rows = stmt.all(userId) || [];
+  return rows
+    .filter((row) => row.type !== "user" || areFriends(row.ownerId, userId))
+    .map((row) => ({
+      ...rowToCookbook(row),
+      shareId: row.shareId,
+      shareToken: row.token,
+      canEdit: Boolean(row.canEdit),
+      sharedAt: row.sharedAt,
+      ownerUsername: row.ownerUsername || "",
+      shareType: row.type,
+    }));
+};
+
+export const listCookbookMemberIds = (cookbookId) => {
+  if (!cookbookId) return [];
+  const cookbook = getCookbookById(cookbookId);
+  const ids = new Set();
+  if (cookbook?.ownerId) ids.add(cookbook.ownerId);
+  const stmt = db.prepare("SELECT userId FROM cookbook_shares WHERE cookbookId = ? AND type = 'user'");
+  const rows = stmt.all(cookbookId) || [];
+  rows.forEach((row) => ids.add(row.userId));
+  return Array.from(ids);
+};
+
+export const isCookbookEditor = (cookbookId, userId) => {
+  const cookbook = getCookbookById(cookbookId);
+  if (!cookbook) return false;
+  if (cookbook.ownerId === userId) return true;
+  const share = db
+    .prepare("SELECT canEdit FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'")
+    .get(cookbookId, userId);
+  return Boolean(share?.canEdit);
+};
+
+export const getLibraryForUser = (userId) => {
+  const cookbooks = listCookbooksForOwner(userId);
+  const sharedCookbooks = listSharedCookbooksForUser(userId);
+  const sharedIds = new Set(sharedCookbooks.map((cb) => cb.id));
+  const accessibleCookbookIds = [...cookbooks.map((cb) => cb.id), ...sharedIds];
+  const recipes = getRecipesForCookbookIds(accessibleCookbookIds).map((recipe) => ({
+    ...recipe,
+    canEdit: recipe.ownerId === userId || isCookbookEditor(recipe.cookbookId, userId),
+    isSharedCookbook: sharedIds.has(recipe.cookbookId),
+  }));
+  return { cookbooks, sharedCookbooks, recipes };
 };
 
 export const countOwners = () => {
