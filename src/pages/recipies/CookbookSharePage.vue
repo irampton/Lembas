@@ -1,136 +1,125 @@
 <template>
-  <section class="mx-auto flex max-w-7xl flex-col gap-6">
+  <section>
     <div
       v-if="loading"
-      class="rounded-xl border border-slate-200 bg-white px-4 py-5 text-slate-700 shadow-sm md:px-6"
     >
-      <p class="text-sm">Loading shared cookbook…</p>
+      <p>Loading shared cookbook…</p>
     </div>
 
     <div
       v-else-if="error"
-      class="rounded-xl border border-slate-200 bg-white px-4 py-5 text-slate-700 shadow-sm md:px-6"
     >
-      <p class="text-lg font-semibold text-slate-900">Unable to load shared cookbook</p>
-      <p class="mt-1 text-sm">{{ error }}</p>
+      <p>Unable to load shared cookbook</p>
+      <p>{{ error }}</p>
     </div>
 
-    <div v-else-if="cookbook" class="space-y-6">
-      <div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Shared cookbook</p>
-            <h1 class="text-3xl font-bold text-slate-900">{{ cookbook.name }}</h1>
-            <p class="text-sm text-slate-600">by {{ ownerName }}</p>
+    <div v-else-if="cookbook">
+      <div>
+        <div>
+          <div>
+            <p>Shared cookbook</p>
+            <h1>{{ cookbook.name }}</h1>
+            <p>by {{ ownerName }}</p>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div>
             <span
-              class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
             >
-              <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: accentColor }"></span>
+              <span></span>
               <span>{{ recipes.length }} {{ recipes.length === 1 ? 'recipe' : 'recipes' }}</span>
             </span>
             <span
-              class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700"
             >
               Public link
             </span>
           </div>
         </div>
-        <p v-if="cookbook.description" class="mt-4 text-slate-700">{{ cookbook.description }}</p>
+        <p v-if="cookbook.description">{{ cookbook.description }}</p>
       </div>
 
       <div
         v-if="!recipes.length"
-        class="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-600 shadow-sm"
       >
         No recipes have been added to this cookbook yet.
       </div>
 
-      <div v-else class="grid gap-4 md:grid-cols-[280px_1fr]">
-        <aside class="h-max rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div class="flex items-center justify-between px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <div v-else>
+        <aside>
+          <div>
             <span>Recipes</span>
-            <span class="text-slate-400">{{ recipes.length }}</span>
+            <span>{{ recipes.length }}</span>
           </div>
-          <div class="divide-y divide-slate-200">
+          <div>
             <button
               v-for="recipe in recipes"
               :key="recipe.id"
               type="button"
-              class="flex w-full items-center justify-between px-4 py-3 text-left text-sm transition hover:bg-orange-50"
-              :class="{ 'bg-orange-50 text-orange-800 font-semibold': selectedId === recipe.id }"
               @click="selectedId = recipe.id"
             >
-              <span class="truncate">{{ recipe.title }}</span>
-              <span class="text-xs text-slate-400">{{ servingsShort(recipe) }}</span>
+              <span>{{ recipe.title }}</span>
+              <span>{{ servingsShort(recipe) }}</span>
             </button>
           </div>
         </aside>
 
         <article
           v-if="selectedRecipe"
-          class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
         >
-          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div class="space-y-2">
-              <h2 class="text-xl font-semibold text-slate-900">{{ selectedRecipe.title }}</h2>
-              <p v-if="selectedRecipe.description" class="text-sm text-slate-600">{{ selectedRecipe.description }}</p>
-              <p v-if="metaLine(selectedRecipe)" class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div>
+            <div>
+              <h2>{{ selectedRecipe.title }}</h2>
+              <p v-if="selectedRecipe.description">{{ selectedRecipe.description }}</p>
+              <p v-if="metaLine(selectedRecipe)">
                 {{ metaLine(selectedRecipe) }}
               </p>
-              <div class="flex flex-wrap gap-2">
-                <TagPill v-for="tag in selectedRecipe.tags" :key="`${selectedRecipe.id}-${tag}`">
-                  <span class="truncate">{{ tag }}</span>
-                </TagPill>
-                <span v-if="!selectedRecipe.tags?.length" class="text-xs text-slate-400">No tags yet</span>
+              <div>
+                <span v-for="tag in selectedRecipe.tags" :key="`${selectedRecipe.id}-${tag}`">
+                  <span>{{ tag }}</span>
+                </span>
+                <span v-if="!selectedRecipe.tags?.length">No tags yet</span>
               </div>
             </div>
             <div
-              class="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
             >
-              <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: accentColor }"></span>
+              <span></span>
               <span>{{ servingsLabel(selectedRecipe) }}</span>
             </div>
           </div>
 
-          <div class="mt-4 grid gap-4 md:grid-cols-[1fr_1.2fr]">
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p class="text-sm font-semibold text-slate-900">Ingredients</p>
-              <ul class="mt-3 space-y-2 text-sm text-slate-800">
+          <div>
+            <div>
+              <p>Ingredients</p>
+              <ul>
                 <li
                   v-for="(item, idx) in selectedRecipe.ingredients"
                   :key="item.id || idx"
-                  class="flex flex-wrap items-baseline gap-2"
                 >
-                  <span class="font-semibold text-slate-900">{{ item.quantity }}</span>
-                  <span class="text-slate-700">{{ formatUnit(item.unit, item.quantity) }}</span>
-                  <span class="truncate text-slate-800">{{ item.name }}</span>
+                  <span>{{ item.quantity }}</span>
+                  <span>{{ formatUnit(item.unit, item.quantity) }}</span>
+                  <span>{{ item.name }}</span>
                 </li>
-                <li v-if="!selectedRecipe.ingredients?.length" class="text-xs text-slate-500">No ingredients listed.</li>
+                <li v-if="!selectedRecipe.ingredients?.length">No ingredients listed.</li>
               </ul>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p class="text-sm font-semibold text-slate-900">Steps</p>
-              <ol class="mt-3 space-y-3 text-sm text-slate-800">
+            <div>
+              <p>Steps</p>
+              <ol>
                 <li
                   v-for="(step, index) in selectedRecipe.steps"
                   :key="`${selectedRecipe.id}-step-${index}`"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
                 >
-                  <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Step {{ index + 1 }}</span>
-                  <p class="mt-1 leading-relaxed">{{ step || 'No instructions yet.' }}</p>
+                  <span>Step {{ index + 1 }}</span>
+                  <p>{{ step || 'No instructions yet.' }}</p>
                 </li>
-                <li v-if="!selectedRecipe.steps?.length" class="text-xs text-slate-500">No steps yet.</li>
+                <li v-if="!selectedRecipe.steps?.length">No steps yet.</li>
               </ol>
             </div>
           </div>
 
-          <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
-            <p class="font-semibold text-slate-900">Notes</p>
-            <p v-if="selectedRecipe.notes" class="mt-2 whitespace-pre-line leading-relaxed">{{ selectedRecipe.notes }}</p>
-            <p v-else class="mt-2 text-slate-500">No notes added.</p>
+          <div>
+            <p>Notes</p>
+            <p v-if="selectedRecipe.notes">{{ selectedRecipe.notes }}</p>
+            <p v-else>No notes added.</p>
           </div>
         </article>
       </div>
@@ -141,7 +130,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import TagPill from '../../baseComponents/TagPill.vue';
 
 const route = useRoute();
 

@@ -1,15 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import HomePage from '../pages/recipies/HomePage.vue';
-import RecipeDetailPage from '../pages/recipies/RecipeDetailPage.vue';
-import RecipeFormPage from '../pages/recipies/RecipeFormPage.vue';
-import RecipeImportPage from '../pages/recipies/RecipeImportPage.vue';
-import CookbookSharePage from '../pages/recipies/CookbookSharePage.vue';
-import LoginPage from '../pages/login/LoginPage.vue';
-import SignupPage from '../pages/login/SignupPage.vue';
-import AdminUsersPage from '../pages/settings/AdminUsersPage.vue';
-import AdminServerSettingsPage from '../pages/settings/AdminServerSettingsPage.vue';
-import FriendsPage from '../pages/settings/FriendsPage.vue';
-import { useAuthStore } from '../stores/authStore';
+import HomePage from './pages/recipies/HomePage.vue';
+import RecipeDetailPage from './pages/recipies/RecipeDetailPage.vue';
+import RecipeFormPage from './pages/recipies/RecipeFormPage.vue';
+import RecipeImportPage from './pages/recipies/RecipeImportPage.vue';
+import CookbookSharePage from './pages/recipies/CookbookSharePage.vue';
+import LoginPage from './pages/login/LoginPage.vue';
+import SignupPage from './pages/login/SignupPage.vue';
+import AdminUsersPage from './pages/settings/AdminUsersPage.vue';
+import AdminServerSettingsPage from './pages/settings/AdminServerSettingsPage.vue';
+import FriendsPage from './pages/settings/FriendsPage.vue';
+import { useAuthStore } from './stores/authStore';
 
 const router = createRouter({
   history: createWebHistory(),

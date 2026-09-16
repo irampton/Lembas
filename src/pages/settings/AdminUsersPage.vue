@@ -1,32 +1,29 @@
 <template>
-  <section class="mx-auto flex max-w-5xl flex-col gap-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-    <div class="flex items-start justify-between gap-4">
+  <section>
+    <div>
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-orange-600">Admin</p>
-        <h1 class="text-2xl font-semibold text-slate-900">Users</h1>
-        <p class="text-sm text-slate-600">Manage users, roles, and issue join codes.</p>
+        <p>Admin</p>
+        <h1>Users</h1>
+        <p>Manage users, roles, and issue join codes.</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <label class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-700">
+      <div>
+        <label>
           Max uses
           <input
             v-model.number="state.maxUses"
             type="number"
             min="1"
             max="50"
-            class="w-16 rounded border border-slate-200 px-2 py-1 text-sm font-semibold text-slate-900"
           />
         </label>
-        <label class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-700">
+        <label>
           Expires
           <input
             v-model="state.expiresAt"
             type="date"
-            class="rounded border border-slate-200 px-2 py-1 text-sm font-semibold text-slate-900"
           />
         </label>
         <button
-          class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-100"
           type="button"
           :disabled="state.loading"
           @click="loadData"
@@ -34,7 +31,6 @@
           Refresh
         </button>
         <button
-          class="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
           type="button"
           :disabled="state.generating"
           @click="generateCode('user')"
@@ -44,28 +40,26 @@
       </div>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <div class="flex items-center justify-between">
-          <p class="text-sm font-semibold text-slate-900">Users</p>
-          <span class="text-xs font-semibold text-slate-600">{{ state.users.length }} total</span>
+    <div>
+      <div>
+        <div>
+          <p>Users</p>
+          <span>{{ state.users.length }} total</span>
         </div>
-        <div v-if="state.loading" class="mt-3 text-sm text-slate-600">Loading users…</div>
-        <div v-else class="mt-3 space-y-2">
+        <div v-if="state.loading">Loading users…</div>
+        <div v-else>
           <div
             v-for="user in state.users"
             :key="user.id"
-            class="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200"
           >
             <div>
-              <p class="text-sm font-semibold text-slate-900">{{ user.username }}</p>
-              <p class="text-xs uppercase tracking-[0.15em] text-orange-600">{{ user.role }}</p>
+              <p>{{ user.username }}</p>
+              <p>{{ user.role }}</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div>
               <select
                 v-if="isOwner && user.role !== 'owner'"
                 v-model="userRoles[user.id]"
-                class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-800"
                 @change="updateRole(user.id, userRoles[user.id])"
               >
                 <option value="user">user</option>
@@ -73,7 +67,6 @@
               </select>
               <button
                 v-if="user.role !== 'owner'"
-                class="text-xs font-semibold text-red-600 hover:underline"
                 type="button"
                 @click="openDeleteDialog(user)"
               >
@@ -84,30 +77,28 @@
         </div>
       </div>
 
-      <div class="rounded-xl border border-orange-100 bg-orange-50 p-4">
-        <div class="flex items-center justify-between">
-          <p class="text-sm font-semibold text-orange-900">Join codes</p>
-          <span class="text-xs font-semibold text-orange-700">Share with care</span>
+      <div>
+        <div>
+          <p>Join codes</p>
+          <span>Share with care</span>
         </div>
-        <div v-if="state.loading" class="mt-3 text-sm text-orange-800">Loading codes…</div>
-        <div v-else class="mt-3 space-y-2">
+        <div v-if="state.loading">Loading codes…</div>
+        <div v-else>
           <div
             v-for="code in state.joinCodes"
             :key="code.code"
-            class="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm ring-1 ring-orange-100"
           >
             <div>
-              <p class="font-mono text-sm font-semibold text-slate-900">{{ printableCode(code.code) }}</p>
-              <p class="text-xs uppercase tracking-[0.15em] text-orange-600">{{ code.role }}</p>
+              <p>{{ printableCode(code.code) }}</p>
+              <p>{{ code.role }}</p>
             </div>
-            <div class="flex items-center gap-3">
-              <div class="text-right text-xs text-slate-600">
+            <div>
+              <div>
                 <p>{{ code.usedCount }} / {{ code.maxUses }} used</p>
                 <p v-if="code.expiresAt">Expires {{ formatDate(code.expiresAt) }}</p>
                 <p v-else>Never expires</p>
               </div>
               <button
-                class="text-xs font-semibold text-red-600 hover:underline"
                 type="button"
                 @click="removeCode(code.code)"
               >
@@ -115,27 +106,24 @@
               </button>
             </div>
           </div>
-          <p v-if="!state.joinCodes.length" class="text-sm text-orange-800">No codes yet.</p>
+          <p v-if="!state.joinCodes.length">No codes yet.</p>
         </div>
       </div>
     </div>
 
-    <p v-if="state.error" class="text-sm font-semibold text-red-600">{{ state.error }}</p>
+    <p v-if="state.error">{{ state.error }}</p>
 
-    <ConfirmDialog
-      :open="deleteDialog.open"
-      :title="`Remove ${deleteDialog.user?.username || 'this user'}?`"
-      :message="`This will permanently remove ${deleteDialog.user?.username || 'the user'} and their access. This cannot be undone.`"
-      confirm-label="Remove"
-      @cancel="closeDeleteDialog"
-      @confirm="confirmRemove"
-    />
+    <div v-if="deleteDialog.open">
+      <p>Remove {{ deleteDialog.user?.username || 'this user' }}?</p>
+      <p>This permanently removes their access.</p>
+      <button type="button" @click="confirmRemove">Remove</button>
+      <button type="button" @click="closeDeleteDialog">Cancel</button>
+    </div>
   </section>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive } from 'vue';
-import ConfirmDialog from '../../baseComponents/ConfirmDialog.vue';
 import { useAuthStore } from '../../stores/authStore';
 
 const auth = useAuthStore();
