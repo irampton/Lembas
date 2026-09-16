@@ -23,6 +23,13 @@ Production-style serve (builds client assets then starts the API + static server
 npm start
 ```
 
+Development serve (starts the Node API server at the first available port beginning with 3001 and runs Vite alongside it, with API and Socket.IO requests proxied through Vite):
+```
+npm run dev
+```
+
+Open the local URL printed by Vite (normally http://localhost:5173). Vue edits update live; press `Ctrl+C` to stop both servers. If backend port 3001 is occupied, the launcher automatically tries 3002, 3003, and so on. Set `BACKEND_PORT` to start scanning from a different port. Use `npm run dev:client` or `npm run dev:server` to run either process alone.
+
 Or use `npm run build` to build separately, then  `node index.js` to run.
 
 ## Basic usage
