@@ -10,6 +10,8 @@ const state = reactive({
   error: null,
   ready: false,
   importedDraft: null,
+  searchQuery: '',
+  excludedCookbookIds: [],
 });
 
 const sortByTitle = (list) =>
@@ -121,6 +123,8 @@ export const useRecipeStore = () => ({
     state.sharedCookbooks = [];
     state.ready = false;
     state.error = null;
+    state.searchQuery = '';
+    state.excludedCookbookIds = [];
   },
   setImportedDraft: (draft) => {
     state.importedDraft = draft || null;

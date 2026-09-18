@@ -15,9 +15,12 @@
     <div class="relative w-1/3 max-w-md">
       <MagnifyingGlassIcon class="absolute right-3 top-1/2 size-5 -translate-y-1/2 text-gray-500" />
       <input
+        v-model="recipes.state.searchQuery"
         type="search"
         class="w-full rounded-full border border-amber-200 bg-white py-2 pl-4 pr-10 text-sm text-gray-800 outline-none"
         aria-label="Search recipes"
+        placeholder="Search recipes"
+        @input="showSearchResults"
       >
     </div>
     <div class="relative flex items-center gap-3 text-right">
@@ -70,16 +73,23 @@
 <script setup>
 import { ref } from 'vue';
 import { Bars3Icon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@heroicons/vue/24/outline';
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BaseButton from '../baseComponents/BaseButton.vue';
 import BaseFloatingBox from '../baseComponents/BaseFloatingBox.vue';
 import BaseSidebar from '../baseComponents/BaseSidebar.vue';
 import { useAuthStore } from '../stores/authStore';
+import { useRecipeStore } from '../stores/recipeStore';
 
 const auth = useAuthStore();
+const recipes = useRecipeStore();
 const router = useRouter();
+const route = useRoute();
 const profileMenuOpen = ref(false);
 const sidebarOpen = ref(false);
+
+const showSearchResults = () => {
+  if (route.name !== 'home') router.push({ name: 'home' });
+};
 
 const openNewRecipe = () => {
   sidebarOpen.value = false;
