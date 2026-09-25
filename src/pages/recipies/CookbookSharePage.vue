@@ -141,7 +141,7 @@ const selectedId = ref('');
 
 const token = computed(() => route.params.token);
 const ownerName = computed(() => cookbook.value?.ownerUsername || 'Unknown cook');
-const accentColor = computed(() => cookbook.value?.color || '#fb923c');
+const accentColor = computed(() => cookbook.value?.color || '#1D6AA3');
 const selectedRecipe = computed(() => recipes.value.find((r) => r.id === selectedId.value) || recipes.value[0] || null);
 
 const loadShare = async () => {

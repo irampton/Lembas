@@ -1,14 +1,14 @@
 <template>
   <div
-    class="flex cursor-pointer flex-col rounded px-2 py-3 hover:bg-orange-50 focus-visible:outline-2"
+    class="flex cursor-pointer flex-col rounded px-4 py-3 bg-base-alt text-base-dark hover:bg-white rounded-2xl focus-visible:outline-2"
     role="link"
     tabindex="0"
     @click="openRecipe"
     @keydown.enter.prevent="openRecipe"
   >
     <div class="truncate text-lg font-bold" :title="recipeName">{{ recipeName }}</div>
-    <div class="truncate ml-px text-sm text-stone-600" :title="ingredientSummary">{{ ingredientSummary }}</div>
-    <div class="truncate mt-1 -ml-2">
+    <div class="truncate ml-px text-sm text-light" :title="ingredientSummary">{{ ingredientSummary }}</div>
+    <div class="truncate text-light mt-1 -ml-2">
       <BaseTag v-for="(tag, index) in normalizedTags" :key="`${tag.name}-${index}`" :color="tag.color" class="ml-1 align-middle">{{ tag.name }}</BaseTag>
     </div>
   </div>

@@ -17,10 +17,10 @@ const props = defineProps({
 
 const buttonClasses = computed(() => {
   const typeClasses = {
-    action: 'bg-orange-200 text-white hover:bg-orange-300',
-    next: 'bg-orange-700 text-white hover:bg-orange-800',
-    save: 'bg-green-700 text-white hover:bg-green-800',
-    cancel: 'bg-gray-300 text-black hover:bg-gray-400',
+    action: 'bg-accent text-white hover:bg-accent-alt',
+    next: 'bg-primary text-white hover:bg-primary-alt',
+    save: 'bg-primary text-white hover:bg-primary-alt',
+    cancel: 'bg-light text-black hover:bg-base-dark-alt',
   };
 
   return ['rounded-full px-4 py-2 font-semibold transition-colors', typeClasses[props.type]];

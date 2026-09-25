@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full flex flex-row items-center justify-between sticky top-0 bg-amber-500 p-4">
+  <div class="w-full flex flex-row items-center justify-between sticky top-0 bg-primary p-4">
     <div class="flex items-center gap-4">
       <button
         type="button"
@@ -17,9 +17,8 @@
       <input
         v-model="recipes.state.searchQuery"
         type="search"
-        class="w-full rounded-full border border-amber-200 bg-white py-2 pl-4 pr-10 text-sm text-gray-800 outline-none"
+        class="w-full rounded-full border border-primary-alt bg-white py-2 pl-4 pr-10 text-sm text-gray-800 outline-none"
         aria-label="Search recipes"
-        placeholder="Search recipes"
         @input="showSearchResults"
       >
     </div>
@@ -41,14 +40,14 @@
         class="absolute right-0 top-full z-10 mt-3 min-w-44 text-left"
         @clickaway="profileMenuOpen = false"
       >
-        <p class="border-b border-amber-100 pb-2 font-semibold text-gray-800">{{ auth.state.user?.username }}</p>
-        <RouterLink :to="{ name: 'settings-friends' }" class="mt-2 block text-amber-700 hover:text-amber-900">
+        <p class="border-b border-primary-alt pb-2 font-semibold text-gray-800">{{ auth.state.user?.username }}</p>
+        <RouterLink :to="{ name: 'settings-friends' }" class="mt-2 block text-primary hover:text-primary-alt">
           Friends
         </RouterLink>
         <RouterLink
           v-if="auth.canManageUsers()"
           :to="{ name: 'admin-server-settings' }"
-          class="mt-2 block text-amber-700 hover:text-amber-900"
+          class="mt-2 block text-primary hover:text-primary-alt"
         >
           Admin
         </RouterLink>
@@ -61,7 +60,7 @@
         </div>
         <div class="mt-6 flex items-center justify-between px-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
           <span>Cookbooks</span>
-          <button type="button" class="text-amber-700" aria-label="Add cookbook">
+          <button type="button" class="text-primary" aria-label="Add cookbook">
             <PlusIcon class="size-5" />
           </button>
         </div>

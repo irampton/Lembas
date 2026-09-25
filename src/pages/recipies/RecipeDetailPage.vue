@@ -37,7 +37,7 @@
             </div>
           </div>
           <div>
-            <span class="text-emerald-800">{{ recipe.author }}</span>
+            <span class="text-primary">{{ recipe.author }}</span>
             •
             <span>{{ formattedDate }}</span>
             •
