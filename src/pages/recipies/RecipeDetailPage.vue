@@ -1,192 +1,58 @@
 <template>
-  <section>
-    <div
-      v-if="!isShareRoute && store.state.loading && !store.state.ready"
-    >
-      Loading recipe…
-    </div>
-
-    <div v-else-if="isShareRoute && shareLoading">
-      <p>Loading shared recipe…</p>
-    </div>
-
-    <div
-      v-else-if="!recipe && !isShareRoute"
-    >
-      <p>Recipe not found</p>
-      <p>It might have been removed or not saved yet. Create a new one to get started.</p>
-      <div>
-        <RouterLink
-          :to="{ name: 'recipe-new' }"
-        >
-          <PlusIcon />
-          Create recipe
-        </RouterLink>
-        <RouterLink
-          :to="{ name: 'home' }"
-        >
-          Go home
-        </RouterLink>
+  <div class="flex flex-row justify-between">
+    <div></div>
+    <section class="m-2 w-full md:w-2/3">
+      <div v-if="!isShareRoute && store.state.loading && !store.state.ready">
+        Loading recipe…
       </div>
-    </div>
 
-    <div v-else-if="shareError">
-      <p>Unable to load shared recipe</p>
-      <p>{{ shareError }}</p>
-    </div>
+      <div v-else-if="isShareRoute && shareLoading">
+        <p>Loading shared recipe…</p>
+      </div>
 
-    <div v-else>
-      <div>
+      <div v-else-if="!recipe && !isShareRoute">
+        <p>Recipe not found</p>
+        <p>It might have been removed or not saved yet. Create a new one to get started.</p>
         <div>
-          <h1>{{ recipe.title }}</h1>
-          <p v-if="metaLine">{{ metaLine }}</p>
-          <p v-if="recipe.description">{{ recipe.description }}</p>
-          <div>
-            <div>
-              <span v-for="tag in recipe.tags" :key="`${recipe.id}-${tag}`">
-                  <span>{{ tag }}</span>
-                  <button
-                    v-if="canEditRecipe"
-                    type="button"
-                    @click="removeTag(tag)"
-                    title="Remove tag"
-                  >
-                    ×
-                  </button>
-              </span>
-              <button
-                v-if="canEditRecipe"
-                type="button"
-                title="Add tag"
-                @click="toggleTagInput"
-              >
-                +
-              </button>
-              <span v-if="!recipe.tags?.length">No tags yet</span>
-            </div>
-            <div
-              v-if="showTagInput"
-            >
-              <div>
-                <div>
-                  <input
-                    v-model="tagInput"
-                    type="text"
-                    placeholder="Type a tag"
-                    @keyup.enter="confirmTag"
-                    autofocus
-                  />
-                  <div>
-                    <button
-                      type="button"
-                      @click="confirmTag"
-                    >
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      @click="closeTagInput"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
+          <RouterLink :to="{ name: 'recipe-new' }">
+            <PlusIcon />
+            Create recipe
+          </RouterLink>
+          <RouterLink :to="{ name: 'home' }">
+            Go home
+          </RouterLink>
+        </div>
+      </div>
+
+      <div v-else-if="shareError">
+        <p>Unable to load shared recipe</p>
+        <p>{{ shareError }}</p>
+      </div>
+
+      <div v-else>
+          <div class="flex flex-row justify-between">
+            <div class="font-bold text-2xl border-b-2 border-solid">{{ recipe.title }}</div>
+            <div class="text-right">
+              <ArrowUpOnSquareIcon class="mt-2 size-6"/>
             </div>
           </div>
-        </div>
-        <div v-if="canEditRecipe">
-          <button
-            type="button"
-            @click="editRecipe"
-            title="Edit recipe"
-          >
-            <PencilSquareIcon />
-          </button>
-          <button
-            type="button"
-            @click="openDeleteDialog"
-            title="Delete recipe"
-          >
-            <TrashIcon />
-          </button>
-        </div>
-        <RouterLink
-          v-else-if="sharePermissions.canEdit"
-          :to="{ name: 'recipe-share-edit', params: { token: route.params.token } }"
-          title="Edit shared recipe"
-        >
-          <PencilSquareIcon />
-        </RouterLink>
-      </div>
-
-      <div>
-        <div>
           <div>
-            <h2>Ingredients</h2>
+            <span class="text-emerald-800">{{ recipe.author }}</span>
+            •
+            <span>{{ formattedDate }}</span>
+            •
+            <span>{{ recipe.servingSize }}</span>
           </div>
-          <div>
-            <ul>
-              <li
-                v-for="(item, idx) in recipe.ingredients"
-                :key="item.id || idx"
-              >
-                <span>{{ item.quantity }}</span>
-                <span
-                  :title="item.unit"
-                >
-                  {{ formatUnit(item.unit, item.quantity) }}
-                </span>
-                <span :title="item.name">{{ item.name }}</span>
-              </li>
-              <li v-if="!recipe.ingredients?.length">No ingredients added yet.</li>
-            </ul>
-          </div>
-        </div>
-
-        <div>
-          <div>
-            <h2>Directions</h2>
-          </div>
-          <ol>
-            <li
-              v-for="(step, index) in recipe.steps"
-              :key="`${recipe.id}-step-${index}`"
-            >
-              <div>
-                <span>Step {{ index + 1 }}</span>
-                <p>{{ step || 'No instructions yet.' }}</p>
-              </div>
-            </li>
-            <li v-if="!recipe.steps?.length">No steps added yet.</li>
-          </ol>
-        </div>
       </div>
-
-      <div>
-        <div>
-          <h2>Notes</h2>
-        </div>
-        <div>
-          <p v-if="recipe.notes">{{ recipe.notes }}</p>
-          <p v-else>No notes added yet.</p>
-        </div>
-      </div>
-
-      <div v-if="showDeleteConfirm">
-        <p>Delete this recipe?</p>
-        <p>This cannot be undone.</p>
-        <button type="button" @click="confirmDelete">Delete</button>
-        <button type="button" @click="cancelDelete">Cancel</button>
-      </div>
-    </div>
-  </section>
+    </section>
+    <div></div>
+  </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { PencilSquareIcon, PlusIcon, TrashIcon, ArrowUpOnSquareIcon } from '@heroicons/vue/24/outline';
 import { useRecipeStore } from '../../stores/recipeStore.js';
 
 const store = useRecipeStore();
@@ -218,14 +84,6 @@ const formattedDate = computed(() => {
   if (!recipe.value?.createdAt) return '';
   const date = new Date(recipe.value.createdAt);
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-});
-
-const metaLine = computed(() => {
-  const parts = [];
-  if (recipe.value?.author) parts.push(recipe.value.author);
-  if (formattedDate.value) parts.push(formattedDate.value);
-  if (servingSize.value) parts.push(`Serves ${servingSize.value}`);
-  return parts.join(' - ');
 });
 
 const abbreviations = {
