@@ -30,8 +30,8 @@
     </div>
     <p v-if="store.state.error" role="alert" class="mb-3 text-red-700">{{ store.state.error }} <button type="button" class="underline" @click="store.loadLibrary()">Retry</button></p>
     <p v-if="store.state.loading && !store.state.ready" role="status">Loading recipes…</p>
-    <ul v-else-if="recipes.length" class="divide-y divide-base-dark">
-      <li v-for="recipe in recipes" :key="recipe.id">
+    <ul v-else-if="recipes.length">
+      <li v-for="recipe in recipes" :key="recipe.id" class="my-2">
         <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-list="recipe.ingredients" :tags="recipe.tags" />
       </li>
     </ul>

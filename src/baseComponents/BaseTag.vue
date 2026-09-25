@@ -2,7 +2,7 @@
   <span class="base-tag" :style="{ backgroundColor: color }"><slot /></span>
 </template>
 <script setup>
-defineProps({ color: { type: String, default: 'var(--color-primary-alt)' } });
+defineProps({ color: { type: String, default: 'var(--color-primary)' } });
 </script>
 <style scoped>
 .base-tag {
@@ -11,7 +11,7 @@ defineProps({ color: { type: String, default: 'var(--color-primary-alt)' } });
   overflow: hidden;
   padding: 0.125rem 0.625rem;
   border-radius: 9999px;
-  color: var(--color-base-dark);
+  color: var(--color-base-alt);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.5;
