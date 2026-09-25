@@ -18,68 +18,81 @@
     </div>
 
     <div v-else>
-      <div class="flex flex-row justify-between">
+      <div class="flex flex-row justify-between md:mx-5">
         <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
-        <div class="flex flex-row text-right">
-          <PencilIcon v-if="canEditRecipe" class="mt-2 mx-3 size-6" />
-          <ArrowUpOnSquareIcon class="mt-2 size-6" />
+        <div class="flex flex-row text-right md:mt-1 text-accent-alt">
+          <PencilIcon v-if="canEditRecipe" class="mt-2 mx-3 size-6 md:size-8" />
+          <ArrowUpOnSquareIcon class="mt-2 size-6 md:size-8" />
         </div>
       </div>
-      <div class="text-light border-b border-light pb-1 pl-px pt-px">
+      <div class="text-light pb-1 pl-px pt-px md:ml-5">
         <span v-if="recipe.author">{{ recipe.author }}</span>
         <span v-if="recipe.author && formattedDate"> • </span>
         <span v-if="formattedDate">{{ formattedDate }}</span>
         <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
         <span v-if="servingSize">{{ servingSize }}</span>
       </div>
+
       <div class="flex flex-col md:flex-row">
-        <div class="md:w-1/2 md:pr-4">
-          <div class="font-bold text-base-dark text-3xl py-2">Ingredients</div>
-          <div class="flex flex-row">
-            <div>
-              <div
-                v-for="(ingredient, index) in recipe.ingredients"
-                :key="ingredient.id || index"
-              >
-                <span class="text-right text-accent">{{
-                  ingredientQuantity(ingredient)
-                }}</span>
-              </div>
+
+        <div class="md:w-fit md:pr-2">
+          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+            <div class="font-bold text-base-dark text-3xl pb-2">
+              Ingredients
             </div>
-            <div class="pl-2">
-              <div
-                v-for="(ingredient, index) in recipe.ingredients"
-                :key="ingredient.id || index"
-              >
-                <span class="text-left text-base-dark">{{
-                  ingredient.name
-                }}</span>
+            <div class="flex flex-row">
+              <div class="shrink-0 text-right">
+                <div
+                  v-for="(ingredient, index) in recipe.ingredients"
+                  :key="ingredient.id || index"
+                >
+                  <span class="text-light">{{
+                    ingredientQuantity(ingredient)
+                  }}</span>
+                </div>
+              </div>
+              <div class="pl-2 shrink-0">
+                <div
+                  v-for="(ingredient, index) in recipe.ingredients"
+                  :key="ingredient.id || index"
+                >
+                  <span class="text-left text-base-dark">{{
+                    ingredient.name
+                  }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div>
-          <div class="font-bold text-base-dark text-3xl py-3 md:py-2">
-            Steps
-          </div>
-          <div v-for="(stepText, index) in recipe.steps" :key="`step-${index}`">
-            <div class="flex flex-row my-2">
-              <div
-                class="border-solid border-2 border-accent rounded-4xl text-lg font-bold w-8 h-8 text-center p-0 text-accent shrink-0"
-              >
-                {{ index + 1 }}
-              </div>
-              <div class="ml-2 mt-[2.5px] grow">
-                {{ stepText }}
+        <div class="md:w-fit">
+          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+            <div class="font-bold text-base-dark text-3xl pb-3 md:pb-2">
+              Steps
+            </div>
+            <div
+              v-for="(stepText, index) in recipe.steps"
+              :key="`step-${index}`"
+            >
+              <div class="flex flex-row my-2">
+                <div
+                  class="border-solid border-2 border-accent rounded-4xl text-lg font-bold w-8 h-8 text-center p-0 text-accent shrink-0"
+                >
+                  {{ index + 1 }}
+                </div>
+                <div class="ml-2 mt-[2.5px] grow">
+                  {{ stepText }}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       <div>
-        <div class="font-bold text-base-dark text-3xl py-3">Notes</div>
-        {{ recipe.notes }}
+        <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
+          {{ recipe.notes }}
+        </div>
       </div>
       <!--
       <div>
@@ -90,11 +103,15 @@
       </div>
       -->
       <div>
-        <div class="font-bold text-base-dark text-2xl py-3">Tags</div>
-        <div class="flex flex-row flex-wrap gap-2">
-          <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
-            {{ tag }}
-          </BaseTag>
+        <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div class="flex flex-row flex-wrap gap-2">
+            <BaseTag
+              v-for="(tag, index) in recipe.tags"
+              :key="`${tag}-${index}`"
+            >
+              {{ tag }}
+            </BaseTag>
+          </div>
         </div>
       </div>
     </div>

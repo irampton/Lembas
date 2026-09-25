@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex cursor-pointer flex-col rounded px-4 py-3 bg-base-alt text-base-dark hover:bg-white rounded-2xl focus-visible:outline-2"
+    class="flex cursor-pointer flex-col px-4 py-3 bg-base-alt text-base-dark hover:bg-white rounded-2xl drop-shadow-lg focus-visible:outline-2 "
     role="link"
     tabindex="0"
     @click="openRecipe"

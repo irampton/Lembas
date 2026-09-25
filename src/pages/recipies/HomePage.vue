@@ -19,7 +19,7 @@
         v-for="cookbook in cookbooks"
         :key="cookbook.id"
         type="button"
-        class="flex max-w-full items-center gap-1 rounded-full border border-accent-alt px-3 py-1 font-bold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        class="flex max-w-full items-center gap-1 rounded-full drop-shadow-md px-3 py-1 font-bold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         :class="isCookbookSelected(cookbook.id) ? 'bg-accent text-base-alt' : 'text-base-dark bg-base-alt'"
         :aria-pressed="isCookbookSelected(cookbook.id)"
         @click="toggleCookbook(cookbook.id)"
