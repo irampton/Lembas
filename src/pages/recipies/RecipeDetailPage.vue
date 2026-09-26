@@ -124,6 +124,7 @@ import { useRoute } from "vue-router";
 import { PencilIcon, ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
 import BaseTag from "../../baseComponents/BaseTag.vue";
 import { useRecipeStore } from "../../stores/recipeStore.js";
+import { formatUnit } from "../../mixins/units.js";
 
 const store = useRecipeStore();
 const route = useRoute();
@@ -159,57 +160,6 @@ const formattedDate = computed(() => {
     day: "numeric",
   });
 });
-
-const abbreviations = {
-  tablespoon: "tbsp",
-  tablespoons: "tbsp",
-  tbsp: "tbsp",
-  teaspoon: "tsp",
-  teaspoons: "tsp",
-  tsp: "tsp",
-  gram: "g",
-  grams: "g",
-  kilogram: "kg",
-  kilograms: "kg",
-  ounce: "oz",
-  ounces: "oz",
-  milliliter: "ml",
-  milliliters: "ml",
-  liter: "l",
-  liters: "l",
-  piece: "pc",
-  pieces: "pc",
-  pinch: "pinch",
-};
-
-const parseQuantityNumber = (quantity) => {
-  const val = (quantity || "").toString().trim();
-  if (!val) return null;
-  // handle mixed numbers like "1 1/2"
-  const parts = val.split(" ");
-  let total = 0;
-  parts.forEach((part) => {
-    if (part.includes("/")) {
-      const [num, den] = part.split("/").map(Number);
-      if (!Number.isNaN(num) && !Number.isNaN(den) && den !== 0)
-        total += num / den;
-    } else {
-      const n = Number(part);
-      if (!Number.isNaN(n)) total += n;
-    }
-  });
-  return total || null;
-};
-
-const formatUnit = (unit, quantity) => {
-  const key = (unit || "").toLowerCase().trim();
-  if (key === "cup" || key === "cups") {
-    const qtyNum = parseQuantityNumber(quantity);
-    const isSingular = qtyNum === 1;
-    return isSingular ? "cup" : "cups";
-  }
-  return abbreviations[key] || unit;
-};
 
 const ingredientQuantity = (ingredient) => {
   return [ingredient.quantity, formatUnit(ingredient.unit, ingredient.quantity)]

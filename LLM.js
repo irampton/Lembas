@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { UNIT_VALUES, normalizeUnit } from "./src/mixins/units.js";
 const MODEL = "GPT-OSS-20B";
 
 const SYSTEM_PROMPT = `You are a careful recipe extraction assistant.
@@ -21,7 +22,7 @@ Rules:
 - Standardized ingredients (remove brand names, etc.)
 - If there is no title or description provided, choose one
 - Provide 3-4 concise tags focused on meal type and main ingredients (e.g., "dinner", "dessert", "pumpkin", "chicken", "pasta"); omit dietary labels unless given.
-- Units must be chosen ONLY from this list: ["cup","tbsp","tsp","g","kg","oz","ml","l","piece","pinch"]. Convert close variants (cups, tablespoons, tsp., etc.) to the closest allowed unit. If you cannot map it, leave unit as an empty string.
+- Units must be chosen ONLY from this list: ${JSON.stringify(UNIT_VALUES)}. Convert close variants (cups, tablespoons, tsp., etc.) to the closest allowed unit. If you cannot map it, leave unit as an empty string.
 - Express customary measurements as simple fractions where applicable (e.g., 1/2, 1/3, 1/4, 3/4).
 - Put any additional cook's guidance, substitutions, or reminders into "notes".
 - If a serving size is present, return the numeric/text value in "servingsQuantity" (e.g., "4", "4-6") and the accompanying text in "servingsUnit" (e.g., "servings", "people", "cups"). If you cannot find one, leave them as empty strings.
@@ -52,53 +53,6 @@ const arrayFrom = (value) => {
     return value.split(/[\n,]+/).map((item) => item.trim());
   }
   return [];
-};
-
-const normalizeUnit = (unit) => {
-  const allowed = ["cup", "tbsp", "tsp", "g", "kg", "oz", "ml", "l", "piece", "pinch"];
-  if (!unit) return "";
-  const key = unit.toString().toLowerCase().replace(/\./g, "").trim();
-  const mapping = {
-    c: "cup",
-    cup: "cup",
-    cups: "cup",
-    tablespoon: "tbsp",
-    tablespoons: "tbsp",
-    tbsp: "tbsp",
-    tbs: "tbsp",
-    tablespoonful: "tbsp",
-    teaspoon: "tsp",
-    teaspoons: "tsp",
-    tsp: "tsp",
-    tsps: "tsp",
-    gram: "g",
-    grams: "g",
-    g: "g",
-    kilogram: "kg",
-    kilograms: "kg",
-    kg: "kg",
-    kgs: "kg",
-    ounce: "oz",
-    ounces: "oz",
-    oz: "oz",
-    milliliter: "ml",
-    milliliters: "ml",
-    ml: "ml",
-    liter: "l",
-    litres: "l",
-    litre: "l",
-    l: "l",
-    piece: "piece",
-    pieces: "piece",
-    pc: "piece",
-    pcs: "piece",
-    pinch: "pinch",
-    pinches: "pinch",
-  };
-  const normalized = mapping[key];
-  if (normalized && allowed.includes(normalized)) return normalized;
-  if (allowed.includes(key)) return key;
-  return "";
 };
 
 const normalizeIngredient = (item) => {
