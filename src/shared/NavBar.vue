@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full flex flex-row items-center justify-between sticky top-0 bg-primary p-4">
+  <div class="w-full flex flex-row items-center justify-between sticky top-0 bg-primary p-4 z-100">
     <div class="flex items-center gap-4">
       <button
         type="button"
