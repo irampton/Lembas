@@ -56,11 +56,11 @@
     <Transition name="sidebar">
       <BaseSidebar v-if="sidebarOpen" @close="sidebarOpen = false">
         <div class="flex justify-center">
-          <BaseButton type="action" @click="openNewRecipe">New Recipe</BaseButton>
+          <BaseButton colorType="action" @click="openNewRecipe">New Recipe</BaseButton>
         </div>
         <div class="mt-6 flex items-center justify-between px-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
           <span>Cookbooks</span>
-          <button type="button" class="text-primary" aria-label="Add cookbook">
+          <button type="button" class="text-accent" aria-label="Add cookbook">
             <PlusIcon class="size-5" />
           </button>
         </div>

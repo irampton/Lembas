@@ -10,10 +10,10 @@
 import { computed } from "vue";
 
 const props = defineProps({
-  type: {
+  colorType: {
     type: String,
     default: "action",
-    validator: (value) => ["action", "next", "save", "cancel"].includes(value),
+    validator: (value) => ["action", "submit", "cancel"].includes(value),
   },
   nativeType: {
     type: String,
@@ -23,15 +23,14 @@ const props = defineProps({
 
 const buttonClasses = computed(() => {
   const typeClasses = {
-    action: "bg-accent text-white hover:bg-accent-alt",
-    next: "bg-primary text-white hover:bg-primary-alt",
-    save: "bg-primary text-white hover:bg-primary/80",
+    action: "bg-primary text-white hover:bg-primary/80",
+    submit: "bg-accent text-white hover:bg-accent-alt",
     cancel: "text-black hover:bg-base-alt",
   };
 
   return [
     "rounded-full px-4 py-2 font-semibold transition-colors h-10",
-    typeClasses[props.type],
+    typeClasses[props.colorType],
   ];
 });
 </script>

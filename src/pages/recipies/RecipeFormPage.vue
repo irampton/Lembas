@@ -211,13 +211,13 @@
       <div class="flex justify-end md:mt-6 md:mx-5">
         <BaseButton
           class="mr-2"
-          type="cancel"
+          colorType="cancel"
           @click="$router.push(cancelRoute)"
         >
           Cancel
         </BaseButton>
         <BaseButton
-          type="save"
+          colorType="submit"
           native-type="submit"
           :disabled="isSaving || (isShareEdit && !sharedRecipe)"
         >

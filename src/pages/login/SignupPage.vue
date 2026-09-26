@@ -67,6 +67,7 @@
         <BaseButton
           :disabled="auth.state.loading"
           native-type="submit"
+          colorType="action"
           class="h-auto w-full py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           {{ auth.state.loading ? 'Creating account…' : 'Sign up' }}
