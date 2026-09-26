@@ -61,6 +61,7 @@ db.exec(`
     cookbookId TEXT,
     isPublic INTEGER DEFAULT 0,
     notes TEXT DEFAULT '',
+    servingsVerb TEXT DEFAULT 'Makes',
     servingsQuantity TEXT DEFAULT '',
     servingsUnit TEXT DEFAULT '',
     FOREIGN KEY (ownerId) REFERENCES users(id),
@@ -166,9 +167,13 @@ const parseJson = (value, fallback) => {
 };
 
 const recipeColumns = db.prepare("PRAGMA table_info('recipes')").all();
+const hasServingsVerb = recipeColumns.some((col) => col.name === "servingsVerb");
 const hasServingsQuantity = recipeColumns.some((col) => col.name === "servingsQuantity");
 const hasServingsUnit = recipeColumns.some((col) => col.name === "servingsUnit");
 const hasCookbookId = recipeColumns.some((col) => col.name === "cookbookId");
+if (!hasServingsVerb) {
+  db.exec("ALTER TABLE recipes ADD COLUMN servingsVerb TEXT DEFAULT 'Makes';");
+}
 if (!hasServingsQuantity) {
   db.exec("ALTER TABLE recipes ADD COLUMN servingsQuantity TEXT DEFAULT '';");
 }
@@ -245,6 +250,7 @@ const rowToRecipe = (row) => ({
   cookbookId: row.cookbookId || "",
   isPublic: Boolean(row.isPublic),
   notes: row.notes || "",
+  servingsVerb: row.servingsVerb === "Serves" ? "Serves" : "Makes",
   servingsQuantity: row.servingsQuantity || "",
   servingsUnit: row.servingsUnit || "",
 });
@@ -262,6 +268,7 @@ const serializeRecipe = (recipe) => ({
   cookbookId: recipe.cookbookId ?? "",
   isPublic: recipe.isPublic ? 1 : 0,
   notes: recipe.notes ?? "",
+  servingsVerb: recipe.servingsVerb === "Serves" ? "Serves" : "Makes",
   servingsQuantity: recipe.servingsQuantity ?? "",
   servingsUnit: recipe.servingsUnit ?? "",
 });
@@ -303,8 +310,8 @@ export const getRecipeById = (id, ownerId) => {
 
 export const saveRecipe = (recipe) => {
   const upsertStmt = db.prepare(`
-    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, steps, ownerId, isPublic, notes, servingsQuantity, servingsUnit, cookbookId)
-    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @steps, @ownerId, @isPublic, @notes, @servingsQuantity, @servingsUnit, @cookbookId)
+    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, steps, ownerId, isPublic, notes, servingsVerb, servingsQuantity, servingsUnit, cookbookId)
+    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @steps, @ownerId, @isPublic, @notes, @servingsVerb, @servingsQuantity, @servingsUnit, @cookbookId)
     ON CONFLICT(id) DO UPDATE SET
       title=excluded.title,
       description=excluded.description,
@@ -316,6 +323,7 @@ export const saveRecipe = (recipe) => {
       ownerId=excluded.ownerId,
       isPublic=excluded.isPublic,
       notes=excluded.notes,
+      servingsVerb=excluded.servingsVerb,
       servingsQuantity=excluded.servingsQuantity,
       servingsUnit=excluded.servingsUnit,
       cookbookId=excluded.cookbookId

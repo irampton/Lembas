@@ -21,7 +21,9 @@
       <div class="flex flex-row justify-between md:mx-5">
         <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
         <div class="flex flex-row text-right md:mt-1 text-accent-alt">
-          <PencilIcon v-if="canEditRecipe" class="mt-2 mx-3 size-6 md:size-8" />
+          <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }" class="rounded p-2 hover:bg-base-alt" aria-label="Edit recipe">
+            <PencilIcon class="size-6 md:size-8" />
+          </RouterLink>
           <ArrowUpOnSquareIcon class="mt-2 size-6 md:size-8" />
         </div>
       </div>
@@ -36,7 +38,7 @@
       <div class="flex flex-col md:flex-row">
 
         <div class="md:w-fit md:pr-2">
-          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2 pr-8">
             <div class="font-bold text-base-dark text-3xl pb-2">
               Ingredients
             </div>
@@ -47,7 +49,17 @@
                   :key="ingredient.id || index"
                 >
                   <span class="text-light">{{
-                    ingredientQuantity(ingredient)
+                    ingredient.quantity
+                  }}</span>
+                </div>
+              </div>
+              <div class="pl-2 shrink-0 text-left">
+                <div
+                  v-for="(ingredient, index) in recipe.ingredients"
+                  :key="ingredient.id || index"
+                >
+                  <span class="text-light">{{
+                    formatUnit(ingredient.unit, ingredient.quantity) || "&nbsp;"
                   }}</span>
                 </div>
               </div>
@@ -103,7 +115,7 @@
       </div>
       -->
       <div>
-        <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+        <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 md:mt-4 m-2">
           <div class="flex flex-row flex-wrap gap-2">
             <BaseTag
               v-for="(tag, index) in recipe.tags"
@@ -120,7 +132,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import { PencilIcon, ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
 import BaseTag from "../../baseComponents/BaseTag.vue";
 import { useRecipeStore } from "../../stores/recipeStore.js";
@@ -145,10 +157,11 @@ const canEditRecipe = computed(
 );
 
 const servingSize = computed(() => {
+  const verb = recipe.value?.servingsVerb === "Serves" ? "Serves" : "Makes";
   const quantity = recipe.value?.servingsQuantity?.toString?.().trim() || "";
   const unit = recipe.value?.servingsUnit?.toString?.().trim() || "";
   const combined = [quantity, unit].filter(Boolean).join(" ").trim();
-  return combined || "";
+  return combined ? `${verb} ${combined}` : "";
 });
 
 const formattedDate = computed(() => {

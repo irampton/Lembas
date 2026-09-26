@@ -178,10 +178,11 @@ const metaLine = (recipe) => {
 };
 
 const servingsLabel = (recipe) => {
+  const verb = recipe?.servingsVerb === 'Serves' ? 'Serves' : 'Makes';
   const qty = recipe?.servingsQuantity?.toString?.().trim?.() || '';
   const unit = recipe?.servingsUnit?.toString?.().trim?.() || '';
   const combined = [qty, unit].filter(Boolean).join(' ').trim();
-  return combined ? `Serves ${combined}` : 'Shared recipe';
+  return combined ? `${verb} ${combined}` : 'Shared recipe';
 };
 
 const servingsShort = (recipe) => {

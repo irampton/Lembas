@@ -132,6 +132,7 @@ const normalizeRecipe = (incoming) => {
     cookbookId: incoming.cookbookId?.trim?.() || "",
     isPublic: Boolean(incoming.isPublic),
     notes: incoming.notes?.trim?.() || "",
+    servingsVerb: incoming.servingsVerb === "Serves" ? "Serves" : "Makes",
     servingsQuantity: servingQuantity,
     servingsUnit: servingUnit,
   };
