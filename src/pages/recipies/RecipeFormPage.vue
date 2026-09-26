@@ -248,6 +248,7 @@ import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
 import BaseAutocomplete from "../../baseComponents/BaseAutocomplete.vue";
 import BaseTag from "../../baseComponents/BaseTag.vue";
 import UnitAutocomplete from "../../baseComponents/UnitAutocomplete.vue";
+import { formatQuantity } from "../../utils/formatQuantity.js";
 
 const today = new Date().toISOString().slice(0, 10);
 const makeId = () =>
@@ -446,7 +447,7 @@ export default {
       const nextIngredients = (data.ingredients || []).map((item) => ({
         id: item.id || makeId(),
         name: item.name || "",
-        quantity: item.quantity ?? "",
+        quantity: item.quantityRaw ?? item.quantity ?? "",
         unit: item.unit || "",
       }));
       if (replaceExisting || nextIngredients.length) {
@@ -532,7 +533,8 @@ export default {
         .map((item) => ({
           id: item.id || makeId(),
           name: item.name,
-          quantity: item.quantity,
+          quantity: formatQuantity(item.quantity),
+          quantityRaw: item.quantity,
           unit: item.unit,
         }));
 

@@ -11,6 +11,7 @@ import tesseract from "node-tesseract-ocr";
 import { buildRecipeFromText } from "./LLM.js";
 import * as db from "./db.js";
 import * as auth from "./auth.js";
+import { formatQuantity } from "./src/utils/formatQuantity.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,12 +122,16 @@ const normalizeRecipe = (incoming) => {
     tags: (incoming.tags || [])
       .map((tag) => (tag || "").trim())
       .filter(Boolean),
-    ingredients: (incoming.ingredients || []).map((item) => ({
-      id: item.id || crypto.randomUUID(),
-      name: item.name?.trim() || "",
-      quantity: item.quantity ?? "",
-      unit: item.unit || "",
-    })),
+    ingredients: (incoming.ingredients || []).map((item) => {
+      const quantityRaw = item.quantityRaw ?? item.quantity ?? "";
+      return {
+        id: item.id || crypto.randomUUID(),
+        name: item.name?.trim() || "",
+        quantity: formatQuantity(quantityRaw),
+        quantityRaw,
+        unit: item.unit || "",
+      };
+    }),
     steps: (incoming.steps || []).map((step) => step?.trim()).filter(Boolean),
     ownerId: incoming.ownerId?.trim?.() || incoming.ownerID?.trim?.() || "",
     cookbookId: incoming.cookbookId?.trim?.() || "",
