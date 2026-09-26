@@ -20,7 +20,7 @@
     <div v-else>
       <div class="flex flex-row justify-between md:mx-5">
         <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
-        <div class="flex flex-row text-right md:mt-1 text-accent-alt">
+        <div class="flex flex-row text-right md:mt-1 text-accent">
           <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }" class="rounded p-2 hover:bg-base-alt" aria-label="Edit recipe">
             <PencilIcon class="size-6 md:size-8" />
           </RouterLink>
@@ -77,7 +77,7 @@
           </div>
         </div>
 
-        <div class="md:w-fit">
+        <div class="w-full">
           <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="font-bold text-base-dark text-3xl pb-3 md:pb-2">
               Steps
