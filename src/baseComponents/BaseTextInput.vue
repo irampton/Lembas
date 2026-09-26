@@ -1,15 +1,19 @@
 <template>
   <input
+    ref="input"
     :value="modelValue"
     :placeholder="placeholder"
-    type="text"
+    :type="type"
     :class="['w-full', baseInputClasses, { 'text-xl': xl }]"
     @input="$emit('update:modelValue', $event.target.value)"
   />
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { baseInputClasses } from '../mixins/baseInputMixin.js';
+
+const input = ref(null);
 
 defineProps({
   modelValue: {
@@ -20,6 +24,10 @@ defineProps({
     type: String,
     default: "",
   },
+  type: {
+    type: String,
+    default: "text",
+  },
   xl: {
     type: Boolean,
     default: false,
@@ -27,4 +35,8 @@ defineProps({
 });
 
 defineEmits(["update:modelValue"]);
+
+defineExpose({
+  focus: () => input.value?.focus(),
+});
 </script>

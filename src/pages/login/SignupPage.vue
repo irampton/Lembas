@@ -5,76 +5,72 @@
       <form class="space-y-5" @submit.prevent="handleSignup">
         <div>
           <label for="username" class="mb-1 block font-bold text-base-dark">Username</label>
-        <input
-          id="username"
-          v-model="form.username"
-          type="text"
-          autocomplete="username"
-          class="w-full rounded-xl border border-light/40 bg-white px-4 py-3 text-base-dark outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-          required
-        />
+          <BaseTextInput
+            id="username"
+            v-model="form.username"
+            autocomplete="username"
+            class="px-4 py-3"
+            required
+          />
         </div>
         <div>
           <label for="password" class="mb-1 block font-bold text-base-dark">Password</label>
-        <input
-          id="password"
-          v-model="form.password"
-          type="password"
-          minlength="8"
-          autocomplete="new-password"
-          class="w-full rounded-xl border border-light/40 bg-white px-4 py-3 text-base-dark outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-          required
-        />
+          <BaseTextInput
+            id="password"
+            v-model="form.password"
+            type="password"
+            minlength="8"
+            autocomplete="new-password"
+            class="px-4 py-3"
+            required
+          />
         </div>
         <div>
           <label for="confirm-password" class="mb-1 block font-bold text-base-dark">Confirm password</label>
-          <input
+          <BaseTextInput
             id="confirm-password"
             v-model="form.confirmPassword"
             type="password"
             minlength="8"
             autocomplete="new-password"
-            class="w-full rounded-xl border border-light/40 bg-white px-4 py-3 text-base-dark outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+            class="px-4 py-3"
             required
           />
         </div>
         <div>
           <label for="joinCode" class="mb-1 block font-bold text-base-dark">Join code</label>
           <div class="relative">
-          <input
-            id="joinCode"
-            ref="joinInput"
-            :value="rawJoinCode"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            class="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
-            aria-describedby="join-code-format"
-            @input="handleJoinInput"
-            @paste="handleJoinInput"
-          />
-          <div
-            class="flex justify-center gap-2 rounded-xl border border-light/40 bg-white px-3 py-3 font-mono text-xl font-bold tracking-wide text-base-dark transition focus-within:border-accent"
-            @click="focusJoinInput"
-          >
-            <template v-for="(char, idx) in 7" :key="idx">
-              <span class="inline-flex size-7 items-center justify-center border-b-2 border-accent">
-                {{ codeChars[idx] || '' }}
-              </span>
-              <span v-if="idx === 3" class="text-light">-</span>
-            </template>
+            <BaseTextInput
+              id="joinCode"
+              ref="joinInput"
+              v-model="rawJoinCode"
+              autocomplete="off"
+              spellcheck="false"
+              class="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+              aria-describedby="join-code-format"
+            />
+            <div
+              class="flex justify-center gap-2 rounded-xl border border-light/40 bg-white px-3 py-3 font-mono text-xl font-bold tracking-wide text-base-dark transition focus-within:border-accent"
+              @click="focusJoinInput"
+            >
+              <template v-for="(char, idx) in 7" :key="idx">
+                <span class="inline-flex size-7 items-center justify-center border-b-2 border-accent">
+                  {{ codeChars[idx] || '' }}
+                </span>
+                <span v-if="idx === 3" class="text-light">-</span>
+              </template>
+            </div>
           </div>
-        </div>
           <span id="join-code-format" class="sr-only">Seven letters or numbers</span>
         </div>
         <p v-if="displayError" role="alert" class="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700">{{ displayError }}</p>
-        <button
+        <BaseButton
           :disabled="auth.state.loading"
-          type="submit"
-          class="w-full rounded-full bg-accent px-4 py-3 font-semibold text-white transition-colors hover:bg-accent-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
+          native-type="submit"
+          class="h-auto w-full py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           {{ auth.state.loading ? 'Creating account…' : 'Sign up' }}
-        </button>
+        </BaseButton>
       </form>
       <p class="mt-6 text-center text-sm text-light">
         Already have an account?
@@ -87,6 +83,8 @@
 <script setup>
 import { reactive, computed, ref, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
+import BaseButton from '../../baseComponents/BaseButton.vue';
+import BaseTextInput from '../../baseComponents/BaseTextInput.vue';
 import { useAuthStore } from '../../stores/authStore.js';
 
 const auth = useAuthStore();
@@ -109,10 +107,6 @@ watch(
   },
   { immediate: true }
 );
-
-const handleJoinInput = (event) => {
-  rawJoinCode.value = event.target.value || '';
-};
 
 const focusJoinInput = () => {
   joinInput.value?.focus();

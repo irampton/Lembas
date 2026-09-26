@@ -5,34 +5,33 @@
       <form class="space-y-5" @submit.prevent="handleLogin">
         <div>
           <label for="username" class="mb-1 block font-bold text-base-dark">Username</label>
-        <input
-          id="username"
-          v-model="form.username"
-          type="text"
-          autocomplete="username"
-          class="w-full rounded-xl border border-light/40 bg-white px-4 py-3 text-base-dark outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-          required
-        />
+          <BaseTextInput
+            id="username"
+            v-model="form.username"
+            autocomplete="username"
+            class="px-4 py-3"
+            required
+          />
         </div>
         <div>
           <label for="password" class="mb-1 block font-bold text-base-dark">Password</label>
-        <input
-          id="password"
-          v-model="form.password"
-          type="password"
-          autocomplete="current-password"
-          class="w-full rounded-xl border border-light/40 bg-white px-4 py-3 text-base-dark outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-          required
-        />
+          <BaseTextInput
+            id="password"
+            v-model="form.password"
+            type="password"
+            autocomplete="current-password"
+            class="px-4 py-3"
+            required
+          />
         </div>
         <p v-if="error" role="alert" class="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700">{{ error }}</p>
-        <button
+        <BaseButton
           :disabled="auth.state.loading"
-          type="submit"
-          class="w-full rounded-full bg-accent px-4 py-3 font-semibold text-white transition-colors hover:bg-accent-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
+          native-type="submit"
+          class="h-auto w-full py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           {{ auth.state.loading ? 'Signing in…' : 'Sign in' }}
-        </button>
+        </BaseButton>
       </form>
       <p class="mt-6 text-center text-sm text-light">
         Need an account?
@@ -45,6 +44,8 @@
 <script setup>
 import { reactive, computed } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
+import BaseButton from '../../baseComponents/BaseButton.vue';
+import BaseTextInput from '../../baseComponents/BaseTextInput.vue';
 import { useAuthStore } from '../../stores/authStore.js';
 
 const auth = useAuthStore();
