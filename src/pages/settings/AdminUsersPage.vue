@@ -1,129 +1,141 @@
 <template>
-  <section>
-    <div>
-      <div>
-        <p>Admin</p>
-        <h1>Users</h1>
-        <p>Manage users, roles, and issue join codes.</p>
-      </div>
-      <div>
-        <label>
-          Max uses
-          <input
-            v-model.number="state.maxUses"
-            type="number"
-            min="1"
-            max="50"
-          />
-        </label>
-        <label>
-          Expires
-          <input
-            v-model="state.expiresAt"
-            type="date"
-          />
-        </label>
-        <button
-          type="button"
-          :disabled="state.loading"
-          @click="loadData"
-        >
-          Refresh
-        </button>
-        <button
-          type="button"
-          :disabled="state.generating"
-          @click="generateCode('user')"
-        >
-          New join code
-        </button>
-      </div>
-    </div>
-
-    <div>
-      <div>
-        <div>
-          <p>Users</p>
-          <span>{{ state.users.length }} total</span>
+  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:flex-row lg:items-start">
+    <SettingsSidebar />
+    <section class="min-w-0 flex-1" aria-labelledby="users-title">
+      <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+         <div>
+            <div class="text-accent text-md font-bold uppercase">Admin</div>
+            <div class="text-3xl font-bold md:text-4xl">Users</div>
         </div>
-        <div v-if="state.loading">Loading users…</div>
-        <div v-else>
-          <div
-            v-for="user in state.users"
-            :key="user.id"
-          >
-            <div>
-              <p>{{ user.username }}</p>
-              <p>{{ user.role }}</p>
-            </div>
-            <div>
-              <select
-                v-if="isOwner && user.role !== 'owner'"
-                v-model="userRoles[user.id]"
-                @change="updateRole(user.id, userRoles[user.id])"
-              >
-                <option value="user">user</option>
-                <option value="admin">admin</option>
-              </select>
-              <button
-                v-if="user.role !== 'owner'"
-                type="button"
-                @click="openDeleteDialog(user)"
-              >
-                Remove
-              </button>
-            </div>
+        <BaseButton
+          colorType="cancel" 
+          class="self-start bg-base-alt text-sm shadow-sm sm:self-auto"
+          :disabled="state.loading" 
+          @click="loadData">
+          <span class="flex items-center gap-2 mt-1">
+            <ArrowPathIcon class="size-4" :class="state.loading && 'animate-spin'" />
+          </span>
+        </BaseButton>
+      </header>
+      <p v-if="state.error" role="alert" class="mb-5 rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700">{{
+        state.error }}</p>
+
+      <article class="mb-5 rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6">
+        <div class="mb-5 flex items-start gap-3">
+          <div>
+            <h2 class="text-xl font-bold">Create Join Code</h2>
           </div>
         </div>
-      </div>
-
-      <div>
-        <div>
-          <p>Join codes</p>
-          <span>Share with care</span>
+        <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+          <label class="block"><span class="mb-1 block text-sm font-bold">Maximum uses</span>
+            <BaseNumberInput v-model.number="state.maxUses" min="1" max="50" />
+          </label>
+          <label class="block"><span class="mb-1 block text-sm font-bold">Expiration date <span
+                class="font-normal text-light">(optional)</span></span>
+            <BaseTextInput v-model="state.expiresAt" type="date" />
+          </label>
+          <BaseButton :disabled="state.generating" @click="generateCode('user')"><span
+              class="flex items-center justify-center gap-2">
+              <PlusIcon class="size-5" />{{ state.generating ? 'Creating…' : 'Create code' }}
+            </span></BaseButton>
         </div>
-        <div v-if="state.loading">Loading codes…</div>
-        <div v-else>
-          <div
-            v-for="code in state.joinCodes"
-            :key="code.code"
-          >
+      </article>
+
+      <div class="grid gap-5 xl:grid-cols-2">
+        <article class="overflow-hidden rounded-2xl bg-base-alt drop-shadow-lg">
+          <div class="flex items-center justify-between gap-3 p-5 pb-4 md:px-6">
             <div>
-              <p>{{ printableCode(code.code) }}</p>
-              <p>{{ code.role }}</p>
+              <h2 class="text-xl font-bold">Members</h2>
             </div>
-            <div>
-              <div>
-                <p>{{ code.usedCount }} / {{ code.maxUses }} used</p>
-                <p v-if="code.expiresAt">Expires {{ formatDate(code.expiresAt) }}</p>
-                <p v-else>Never expires</p>
+            <span class="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              {{ state.users.length }} total
+              </span>
+          </div>
+          <p v-if="state.loading" role="status" class="px-6 py-8 text-center text-light">Loading users…</p>
+          <ul v-else-if="state.users.length" class="divide-y divide-accent-alt/15 border-t border-accent-alt/15">
+            <li v-for="user in state.users" :key="user.id"
+              class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 md:px-6">
+              <div class="flex min-w-0 items-center gap-3">
+                <div
+                  class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-bold text-accent">
+                  {{ user.username.charAt(0).toUpperCase() }}</div>
+                <div class="min-w-0">
+                  <p class="truncate font-bold">{{ user.username }}</p>
+                  <p class="text-xs capitalize text-light">{{ user.role }}</p>
+                </div>
               </div>
-              <button
-                type="button"
-                @click="removeCode(code.code)"
-              >
-                Delete
-              </button>
+              <div class="flex items-center gap-2">
+                <BaseDropdown v-if="isOwner && user.role !== 'owner'" v-model="userRoles[user.id]"
+                  class="min-w-24 text-sm capitalize" @change="updateRole(user.id, userRoles[user.id])">
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </BaseDropdown>
+                <span v-else-if="user.role === 'owner'"
+                  class="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">Owner</span>
+                <button v-if="user.role !== 'owner'" type="button"
+                  class="rounded-lg p-2 text-light hover:bg-red-50 hover:text-error"
+                  :aria-label="`Remove ${user.username}`" @click="openDeleteDialog(user)">
+                  <TrashIcon class="size-5" />
+                </button>
+              </div>
+            </li>
+          </ul>
+          <p v-else class="px-6 py-8 text-center text-light">No users found.</p>
+        </article>
+
+        <article class="overflow-hidden rounded-2xl bg-base-alt drop-shadow-lg">
+          <div class="flex items-center justify-between gap-3 p-5 pb-4 md:px-6">
+            <div>
+              <h2 class="text-xl font-bold">Active Join Codes</h2>
             </div>
           </div>
-          <p v-if="!state.joinCodes.length">No codes yet.</p>
-        </div>
+          <p v-if="state.loading" role="status" class="px-6 py-8 text-center text-light">Loading codes…</p>
+          <ul v-else-if="state.joinCodes.length" class="divide-y divide-accent-alt/15 border-t border-accent-alt/15">
+            <li v-for="code in state.joinCodes" :key="code.code"
+              class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 md:px-6">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2"><code
+                    class="font-bold tracking-wider text-base-dark">{{ printableCode(code.code) }}</code><span
+                    class="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold capitalize text-primary">{{
+                    code.role }}</span></div>
+                <p class="mt-1 text-xs text-light">{{ code.usedCount }} / {{ code.maxUses }} used · {{ code.expiresAt ?
+                  `Expires ${formatDate(code.expiresAt)}` : 'Never expires' }}</p>
+              </div>
+              <button type="button" class="rounded-lg p-2 text-light hover:bg-red-50 hover:text-error"
+                :aria-label="`Delete join code ${printableCode(code.code)}`" @click="removeCode(code.code)">
+                <TrashIcon class="size-5" />
+              </button>
+            </li>
+          </ul>
+          <div v-else class="px-6 py-10 text-center">
+            <p class="font-semibold">No active codes</p>
+          </div>
+        </article>
       </div>
-    </div>
+    </section>
 
-    <p v-if="state.error">{{ state.error }}</p>
-
-    <div v-if="deleteDialog.open">
-      <p>Remove {{ deleteDialog.user?.username || 'this user' }}?</p>
-      <p>This permanently removes their access.</p>
-      <button type="button" @click="confirmRemove">Remove</button>
-      <button type="button" @click="closeDeleteDialog">Cancel</button>
-    </div>
-  </section>
+    <BasePopup v-if="deleteDialog.open" aria-label="Remove user" :buttons="['cancel', 'delete']"
+      :delete-disabled="deleteDialog.deleting" @close="closeDeleteDialog" @delete="confirmRemove">
+      <div class="text-center">
+        <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-red-100 text-error">
+          <TrashIcon class="size-6" />
+        </div>
+        <h2 class="text-xl font-bold">Remove {{ deleteDialog.user?.username || 'this user' }}?</h2>
+        <p class="mt-2 text-light">This permanently removes their access to this server.</p>
+      </div>
+    </BasePopup>
+  </main>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive } from 'vue';
+import { ArrowPathIcon, PlusIcon, TicketIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import BaseButton from '../../baseComponents/BaseButton.vue';
+import BaseDropdown from '../../baseComponents/BaseDropdown.vue';
+import BaseNumberInput from '../../baseComponents/BaseNumberInput.vue';
+import BasePopup from '../../baseComponents/BasePopup.vue';
+import BaseTextInput from '../../baseComponents/BaseTextInput.vue';
+import SettingsSidebar from '../../shared/SettingsSidebar.vue';
 import { useAuthStore } from '../../stores/authStore';
 
 const auth = useAuthStore();

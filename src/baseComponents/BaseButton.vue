@@ -26,6 +26,7 @@ const buttonClasses = computed(() => {
     action: "bg-primary text-white hover:bg-primary/80",
     submit: "bg-accent text-white hover:bg-accent-alt",
     cancel: "text-black hover:bg-base-alt",
+    cancelAlt: "text-black hover:bg-white",
     delete: "bg-error text-white hover:bg-error/80",
   };
 
