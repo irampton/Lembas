@@ -13,7 +13,7 @@ const props = defineProps({
   colorType: {
     type: String,
     default: "action",
-    validator: (value) => ["action", "submit", "cancel"].includes(value),
+    validator: (value) => ["action", "submit", "cancel", "delete"].includes(value),
   },
   nativeType: {
     type: String,
@@ -26,6 +26,7 @@ const buttonClasses = computed(() => {
     action: "bg-primary text-white hover:bg-primary/80",
     submit: "bg-accent text-white hover:bg-accent-alt",
     cancel: "text-black hover:bg-base-alt",
+    delete: "bg-error text-white hover:bg-error/80",
   };
 
   return [

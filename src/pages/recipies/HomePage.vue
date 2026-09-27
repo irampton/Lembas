@@ -20,7 +20,8 @@
         :key="cookbook.id"
         type="button"
         class="flex max-w-full items-center gap-1 rounded-full drop-shadow-md px-3 py-1 font-bold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        :class="isCookbookSelected(cookbook.id) ? 'bg-accent text-base-alt' : 'text-base-dark bg-base-alt'"
+        :class="isCookbookSelected(cookbook.id) ? 'opacity-100' : 'opacity-50'"
+        :style="cookbookStyle(cookbook)"
         :aria-pressed="isCookbookSelected(cookbook.id)"
         @click="toggleCookbook(cookbook.id)"
       >
@@ -35,7 +36,7 @@
         <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-list="recipe.ingredients" :tags="recipe.tags" />
       </li>
     </ul>
-    <p v-else-if="!store.state.error" role="status">{{ store.state.recipes.length ? 'No recipes match your filters.' : 'No recipes yet.' }} <RouterLink v-if="!store.state.recipes.length" :to="{ name: 'recipe-new' }" class="text-primary underline">Create a recipe</RouterLink></p>
+    <p v-else-if="!store.state.error" role="status">{{ store.state.recipes.length ? 'No recipes match your filters.' : 'No recipes yet.' }} <RouterLink v-if="!store.state.recipes.length" :to="newRecipeRoute" class="text-primary underline">Create a recipe</RouterLink></p>
   </section>
 </template>
 <script setup>
@@ -48,6 +49,15 @@ const store = useRecipeStore();
 const sortBy = ref('createdAt');
 const descending = ref(true);
 const showFilters = ref(false);
+const cookbookStyle = (cookbook) => {
+  const color = cookbook.color || '#1D6AA3';
+  const hex = color.replace('#', '');
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  const lightColor = Number.isNaN(red) || (red * 299 + green * 587 + blue * 114) / 1000 > 160;
+  return { backgroundColor: color, color: lightColor ? '#1F2937' : '#FFFFFF' };
+};
 const cookbooks = computed(() => [...new Map([...store.state.cookbooks, ...store.state.sharedCookbooks].map((book) => [book.id, book])).values()]);
 const isCookbookSelected = (id) => !store.state.excludedCookbookIds.includes(id);
 const toggleCookbook = (id) => {
@@ -55,6 +65,11 @@ const toggleCookbook = (id) => {
     ? [...store.state.excludedCookbookIds, id]
     : store.state.excludedCookbookIds.filter((excludedId) => excludedId !== id);
 };
+const visibleCookbooks = computed(() => cookbooks.value.filter((cookbook) => isCookbookSelected(cookbook.id)));
+const newRecipeRoute = computed(() => ({
+  name: 'recipe-new',
+  ...(visibleCookbooks.value.length ? { query: { cookbookId: visibleCookbooks.value[0].id } } : {}),
+}));
 const compareNames = (a, b) => String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base', numeric: true });
 const dateValue = (recipe) => Date.parse(recipe.createdAt) || 0;
 const recipes = computed(() => {

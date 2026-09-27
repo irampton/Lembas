@@ -8,7 +8,7 @@
         <div>
           <BaseDropdown
             v-if="showCookbookSelect"
-            v-model="selectedCookbook"
+            v-model="selectedCookbookId"
             :disabled="cookbookReadonly"
             color-style="accent"
             aria-label="Cookbook"
@@ -16,7 +16,7 @@
             <option
               v-for="cookbook in cookbookOptions"
               :key="cookbook.id"
-              :value="cookbook"
+              :value="cookbook.id"
             >
               {{ cookbook.name }}
             </option>
@@ -296,7 +296,7 @@ export default {
         servingsVerb: "Makes",
         servingsQuantity: "",
         servingsUnit: "",
-        cookbookId: "",
+        cookbookId: this.$route.query.cookbookId?.toString() || "",
         tags: [],
       },
       tagInput: "",
@@ -304,7 +304,7 @@ export default {
       isSaving: false,
       sharedRecipe: null,
       shareError: null,
-      selectedCookbook: null,
+      selectedCookbookId: "",
     };
   },
   computed: {
@@ -408,13 +408,13 @@ export default {
     },
     cookbookOptions: {
       handler() {
-        this.syncSelectedCookbook(this.form.cookbookId);
+        this.syncSelectedCookbook();
       },
       deep: true,
       immediate: true,
     },
-    selectedCookbook(cb) {
-      this.form.cookbookId = cb?.id || "";
+    selectedCookbookId(cookbookId) {
+      this.form.cookbookId = cookbookId || "";
     },
   },
   mounted() {
@@ -599,8 +599,11 @@ export default {
     },
     syncSelectedCookbook(cookbookId) {
       if (!this.showCookbookSelect) return;
-      const targetId = cookbookId || this.form.cookbookId;
-      if (targetId && this.selectedCookbook?.id === targetId) return;
+      const routeCookbookId = !this.isEditing
+        ? this.$route.query.cookbookId?.toString()
+        : "";
+      const targetId = cookbookId || routeCookbookId || this.form.cookbookId;
+      if (targetId && this.selectedCookbookId === targetId) return;
 
       const match = this.cookbookOptions.find((cb) => cb.id === targetId);
       if (targetId && !match) {
@@ -613,8 +616,8 @@ export default {
         this.cookbookOptions[0] ||
         null;
 
-      this.selectedCookbook = match || fallback;
-      this.form.cookbookId = this.selectedCookbook?.id || "";
+      this.selectedCookbookId = (match || fallback)?.id || "";
+      this.form.cookbookId = this.selectedCookbookId;
     },
   },
 };

@@ -10,6 +10,7 @@
   --color-base-dark: #332B25;
   --color-base-dark-alt: #211913;
   --color-light: #5C5C5C;
+  --color-error: #C62828;
 }
 
 body {

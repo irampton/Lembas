@@ -79,6 +79,7 @@ db.exec(`
     color TEXT DEFAULT '',
     ownerId TEXT NOT NULL,
     isDefault INTEGER DEFAULT 0,
+    displayOrder INTEGER NOT NULL DEFAULT 0,
     createdAt TEXT NOT NULL,
     FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -195,8 +196,20 @@ try {
 
 const cookbookColumns = db.prepare("PRAGMA table_info('cookbooks')").all();
 const hasCookbookIsDefault = cookbookColumns.some((col) => col.name === "isDefault");
+const hasCookbookDisplayOrder = cookbookColumns.some((col) => col.name === "displayOrder");
 if (!hasCookbookIsDefault) {
   db.exec("ALTER TABLE cookbooks ADD COLUMN isDefault INTEGER DEFAULT 0;");
+}
+if (!hasCookbookDisplayOrder) {
+  db.exec("ALTER TABLE cookbooks ADD COLUMN displayOrder INTEGER NOT NULL DEFAULT 0;");
+  const owners = db.prepare("SELECT DISTINCT ownerId FROM cookbooks").all();
+  const listForMigration = db.prepare("SELECT id FROM cookbooks WHERE ownerId = ? ORDER BY createdAt, id");
+  const updateOrder = db.prepare("UPDATE cookbooks SET displayOrder = ? WHERE id = ?");
+  db.transaction(() => {
+    owners.forEach(({ ownerId }) => {
+      listForMigration.all(ownerId).forEach(({ id }, index) => updateOrder.run(index, id));
+    });
+  })();
 }
 
 try {
@@ -280,6 +293,7 @@ const rowToCookbook = (row) => ({
   color: row.color || "",
   ownerId: row.ownerId || "",
   isDefault: Boolean(row.isDefault),
+  displayOrder: Number(row.displayOrder) || 0,
   createdAt: row.createdAt,
 });
 
@@ -345,6 +359,7 @@ const serializeCookbook = (cookbook) => ({
   color: cookbook.color ?? "",
   ownerId: cookbook.ownerId,
   isDefault: cookbook.isDefault ? 1 : 0,
+  displayOrder: Number(cookbook.displayOrder) || 0,
   createdAt: cookbook.createdAt,
 });
 
@@ -356,7 +371,7 @@ export const getCookbookById = (id) => {
 
 export const listCookbooksForOwner = (ownerId) => {
   if (!ownerId) return [];
-  const stmt = db.prepare("SELECT * FROM cookbooks WHERE ownerId = ? ORDER BY name COLLATE NOCASE");
+  const stmt = db.prepare("SELECT * FROM cookbooks WHERE ownerId = ? ORDER BY displayOrder, createdAt, id");
   return stmt.all(ownerId).map(rowToCookbook);
 };
 
@@ -368,6 +383,7 @@ export const getDefaultCookbookForOwner = (ownerId) => {
 };
 
 export const createCookbook = ({ id, name, description, color, ownerId, isDefault = false, createdAt }) => {
+  const nextOrder = db.prepare("SELECT COALESCE(MAX(displayOrder), -1) + 1 AS value FROM cookbooks WHERE ownerId = ?").get(ownerId).value;
   const payload = serializeCookbook({
     id: id || crypto.randomUUID(),
     name,
@@ -375,13 +391,51 @@ export const createCookbook = ({ id, name, description, color, ownerId, isDefaul
     color,
     ownerId,
     isDefault,
+    displayOrder: nextOrder,
     createdAt: createdAt || new Date().toISOString(),
   });
   const stmt = db.prepare(
-    "INSERT INTO cookbooks (id, name, description, color, ownerId, isDefault, createdAt) VALUES (@id, @name, @description, @color, @ownerId, @isDefault, @createdAt)"
+    "INSERT INTO cookbooks (id, name, description, color, ownerId, isDefault, displayOrder, createdAt) VALUES (@id, @name, @description, @color, @ownerId, @isDefault, @displayOrder, @createdAt)"
   );
   stmt.run(payload);
   return getCookbookById(payload.id);
+};
+
+export const reorderCookbooks = (ownerId, cookbookIds) => {
+  const ownedIds = listCookbooksForOwner(ownerId).map((cookbook) => cookbook.id);
+  if (ownedIds.length !== cookbookIds.length || ownedIds.some((id) => !cookbookIds.includes(id))) return false;
+  const update = db.prepare("UPDATE cookbooks SET displayOrder = ? WHERE id = ? AND ownerId = ?");
+  db.transaction(() => {
+    cookbookIds.forEach((id, index) => update.run(index, id, ownerId));
+  })();
+  return true;
+};
+
+export const deleteCookbook = (id, ownerId, { targetCookbookId, deleteRecipes = false } = {}) => {
+  const cookbook = getCookbookById(id);
+  if (!cookbook || cookbook.ownerId !== ownerId) return { success: false, reason: "not-found" };
+  const remaining = listCookbooksForOwner(ownerId).filter((item) => item.id !== id);
+  if (!remaining.length) return { success: false, reason: "only-cookbook" };
+  const replacement = remaining.find((item) => item.id === targetCookbookId);
+  if (!deleteRecipes && !replacement) return { success: false, reason: "invalid-destination" };
+  const nextDefault = cookbook.isDefault
+    ? replacement || remaining[0]
+    : getDefaultCookbookForOwner(ownerId) || remaining[0];
+  db.transaction(() => {
+    if (cookbook.isDefault) {
+      db.prepare("UPDATE cookbooks SET isDefault = 1 WHERE id = ? AND ownerId = ?").run(nextDefault.id, ownerId);
+    }
+    if (deleteRecipes) {
+      db.prepare("DELETE FROM recipes WHERE cookbookId = ?").run(id);
+    } else {
+      db.prepare("UPDATE recipes SET cookbookId = ? WHERE cookbookId = ?").run(replacement.id, id);
+    }
+    db.prepare("DELETE FROM cookbooks WHERE id = ? AND ownerId = ?").run(id, ownerId);
+    remaining.forEach((item, index) => {
+      db.prepare("UPDATE cookbooks SET displayOrder = ? WHERE id = ? AND ownerId = ?").run(index, item.id, ownerId);
+    });
+  })();
+  return { success: true, replacementId: replacement?.id || null };
 };
 
 export const updateCookbook = (cookbook) => {
@@ -810,7 +864,7 @@ export const listSharedCookbooksForUser = (userId) => {
     JOIN cookbooks cb ON cb.id = cs.cookbookId
     JOIN users u ON u.id = cb.ownerId
     WHERE cs.type = 'user' AND cs.userId = ?
-    ORDER BY cb.name COLLATE NOCASE
+    ORDER BY cb.displayOrder, cb.createdAt, cb.id
   `);
   const rows = stmt.all(userId) || [];
   return rows

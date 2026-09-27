@@ -17,14 +17,17 @@ const state = reactive({
 const sortByTitle = (list) =>
   [...list].sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
 
-const sortByName = (list) =>
-  [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+const sortByDisplayOrder = (list) =>
+  [...list].sort((a, b) =>
+    (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0) ||
+    String(a.createdAt || '').localeCompare(String(b.createdAt || '')) ||
+    String(a.id || '').localeCompare(String(b.id || '')));
 
 const applyLibrary = (payload) => {
   if (!payload) return;
   state.recipes = sortByTitle(payload.recipes || []);
-  state.cookbooks = sortByName(payload.cookbooks || []);
-  state.sharedCookbooks = sortByName(payload.sharedCookbooks || []);
+  state.cookbooks = sortByDisplayOrder(payload.cookbooks || []);
+  state.sharedCookbooks = sortByDisplayOrder(payload.sharedCookbooks || []);
   state.ready = true;
 };
 
@@ -101,6 +104,58 @@ const deleteRecipe = (id) =>
     });
   });
 
+const saveCookbook = async (cookbook) => {
+  const isEditing = Boolean(cookbook.id);
+  const res = await fetch(isEditing ? `/api/cookbooks/${cookbook.id}` : '/api/cookbooks', {
+    method: isEditing ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(cookbook),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to save cookbook.');
+
+  const exists = state.cookbooks.some((item) => item.id === data.cookbook.id);
+  state.cookbooks = sortByDisplayOrder(exists
+    ? state.cookbooks.map((item) => item.id === data.cookbook.id ? data.cookbook : item)
+    : [...state.cookbooks, data.cookbook]);
+  return data.cookbook;
+};
+
+const reorderCookbooks = async (cookbookIds) => {
+  const previous = [...state.cookbooks];
+  const byId = new Map(state.cookbooks.map((cookbook) => [cookbook.id, cookbook]));
+  state.cookbooks = cookbookIds.map((id, index) => ({ ...byId.get(id), displayOrder: index }));
+  try {
+    const res = await fetch('/api/cookbooks/order', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ cookbookIds }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to reorder cookbooks.');
+    state.cookbooks = sortByDisplayOrder(data.cookbooks || state.cookbooks);
+  } catch (error) {
+    state.cookbooks = previous;
+    state.error = error.message || 'Unable to reorder cookbooks.';
+    throw error;
+  }
+};
+
+const deleteCookbook = async (id, options) => {
+  const res = await fetch(`/api/cookbooks/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(options || {}),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to delete cookbook.');
+  state.cookbooks = sortByDisplayOrder(data.cookbooks || state.cookbooks.filter((cookbook) => cookbook.id !== id));
+  state.excludedCookbookIds = state.excludedCookbookIds.filter((cookbookId) => cookbookId !== id);
+};
+
 const getRecipeById = (id) => state.recipes.find((recipe) => recipe.id === id);
 const getSharedRecipeById = (id) => state.sharedRecipes.find((recipe) => recipe.id === id);
 const getCookbookById = (id) =>
@@ -113,6 +168,9 @@ export const useRecipeStore = () => ({
   loadSharedRecipes,
   saveRecipe,
   deleteRecipe,
+  saveCookbook,
+  reorderCookbooks,
+  deleteCookbook,
   getRecipeById,
   getSharedRecipeById,
   getCookbookById,

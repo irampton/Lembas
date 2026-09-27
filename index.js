@@ -419,6 +419,17 @@ app.post("/api/cookbooks", auth.requireAuth, (req, res) => {
   res.json({ success: true, cookbook });
 });
 
+app.put("/api/cookbooks/order", auth.requireAuth, (req, res) => {
+  const cookbookIds = req.body?.cookbookIds;
+  if (!Array.isArray(cookbookIds) || !db.reorderCookbooks(req.user.id, cookbookIds)) {
+    res.status(400).json({ success: false, error: "Invalid cookbook order." });
+    return;
+  }
+  const memberIds = new Set(cookbookIds.flatMap((id) => db.listCookbookMemberIds(id)));
+  memberIds.forEach((id) => emitLibraryForUser(id));
+  res.json({ success: true, cookbooks: db.listCookbooksForOwner(req.user.id) });
+});
+
 app.put("/api/cookbooks/:id", auth.requireAuth, (req, res) => {
   const { id } = req.params;
   const { name, description, color } = req.body || {};
@@ -435,6 +446,27 @@ app.put("/api/cookbooks/:id", auth.requireAuth, (req, res) => {
   });
   emitLibraryForCookbookMembers(id);
   res.json({ success: true, cookbook: updated });
+});
+
+app.delete("/api/cookbooks/:id", auth.requireAuth, (req, res) => {
+  const cookbook = db.getCookbookById(req.params.id);
+  const memberIds = cookbook ? db.listCookbookMemberIds(cookbook.id) : [];
+  const result = db.deleteCookbook(req.params.id, req.user.id, {
+    targetCookbookId: req.body?.targetCookbookId,
+    deleteRecipes: req.body?.deleteRecipes === true,
+  });
+  if (!result.success) {
+    const status = result.reason === "not-found" ? 404 : 400;
+    const error = result.reason === "only-cookbook"
+      ? "You cannot delete your only cookbook."
+      : result.reason === "invalid-destination"
+        ? "Choose a valid destination cookbook."
+        : "Cookbook not found.";
+    res.status(status).json({ success: false, error });
+    return;
+  }
+  new Set([...memberIds, req.user.id]).forEach((id) => emitLibraryForUser(id));
+  res.json({ success: true, cookbooks: db.listCookbooksForOwner(req.user.id) });
 });
 
 app.get("/api/cookbooks/:id/shares", auth.requireAuth, (req, res) => {

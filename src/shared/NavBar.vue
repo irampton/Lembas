@@ -23,7 +23,7 @@
       >
     </div>
     <div class="relative flex items-center gap-3 text-right">
-      <RouterLink :to="{ name: 'recipe-new' }" class="text-white" aria-label="Add new recipe">
+      <RouterLink :to="newRecipeRoute" class="text-white" aria-label="Add new recipe">
         <PlusIcon class="size-6" />
       </RouterLink>
       <button
@@ -60,22 +60,49 @@
         </div>
         <div class="mt-6 flex items-center justify-between px-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
           <span>Cookbooks</span>
-          <button type="button" class="text-accent" aria-label="Add cookbook">
+          <button type="button" class="text-accent" aria-label="Add cookbook" @click="editCookbook = {}">
             <PlusIcon class="size-5" />
           </button>
         </div>
+        <nav class="mt-2" aria-label="Cookbooks">
+          <div
+            v-for="cookbook in recipes.state.cookbooks"
+            :key="cookbook.id"
+            draggable="true"
+            class="mb-2 flex w-full items-center rounded-2xl drop-shadow-lg"
+            :class="draggedCookbookId === cookbook.id ? 'opacity-50' : ''"
+            :style="cookbookStyle(cookbook)"
+            @dragstart="startCookbookDrag(cookbook.id, $event)"
+            @dragend="endCookbookDrag"
+            @dragover.prevent
+            @dragenter.prevent="previewCookbookOrder(cookbook.id)"
+            @drop.prevent="dropCookbook"
+          >
+            <button type="button" class="min-w-0 grow truncate px-3 py-2 text-left font-semibold" @click="openCookbook(cookbook.id)">
+              {{ cookbook.name }}
+            </button>
+            <button type="button" class="shrink-0 rounded-full p-2 hover:bg-black/10" :aria-label="`Edit ${cookbook.name}`" @click="editCookbook = cookbook">
+              <Cog6ToothIcon class="size-5" />
+            </button>
+          </div>
+          <p v-if="recipes.state.ready && !recipes.state.cookbooks.length" class="px-3 py-2 text-sm text-light">
+            No cookbooks yet.
+          </p>
+        </nav>
       </BaseSidebar>
     </Transition>
+    <CookbookPopup v-if="editCookbook" :cookbook="editCookbook.id ? editCookbook : null" @close="editCookbook = null" />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { Bars3Icon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@heroicons/vue/24/outline';
+import { computed, ref } from 'vue';
+import { Bars3Icon, Cog6ToothIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@heroicons/vue/24/outline';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BaseButton from '../baseComponents/BaseButton.vue';
 import BaseFloatingBox from '../baseComponents/BaseFloatingBox.vue';
 import BaseSidebar from '../baseComponents/BaseSidebar.vue';
+import CookbookPopup from './CookbookPopup.vue';
 import { useAuthStore } from '../stores/authStore';
 import { useRecipeStore } from '../stores/recipeStore';
 
@@ -85,6 +112,92 @@ const router = useRouter();
 const route = useRoute();
 const profileMenuOpen = ref(false);
 const sidebarOpen = ref(false);
+const editCookbook = ref(null);
+const draggedCookbookId = ref(null);
+const cookbookOrderBeforeDrag = ref([]);
+const cookbookWasDropped = ref(false);
+
+const startCookbookDrag = (cookbookId, event) => {
+  draggedCookbookId.value = cookbookId;
+  cookbookOrderBeforeDrag.value = [...recipes.state.cookbooks];
+  cookbookWasDropped.value = false;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', cookbookId);
+};
+
+const previewCookbookOrder = (targetId) => {
+  const draggedId = draggedCookbookId.value;
+  if (!draggedId || draggedId === targetId) return;
+  const cookbooks = [...recipes.state.cookbooks];
+  const fromIndex = cookbooks.findIndex((cookbook) => cookbook.id === draggedId);
+  const targetIndex = cookbooks.findIndex((cookbook) => cookbook.id === targetId);
+  if (fromIndex < 0 || targetIndex < 0) return;
+  const [draggedCookbook] = cookbooks.splice(fromIndex, 1);
+  cookbooks.splice(targetIndex, 0, draggedCookbook);
+  recipes.state.cookbooks = cookbooks;
+};
+
+const dropCookbook = async () => {
+  if (!draggedCookbookId.value) return;
+  cookbookWasDropped.value = true;
+  const cookbookIds = recipes.state.cookbooks.map((cookbook) => cookbook.id);
+  try {
+    await recipes.reorderCookbooks(cookbookIds);
+  } catch (error) {
+    recipes.state.cookbooks = cookbookOrderBeforeDrag.value;
+    console.error(error);
+  } finally {
+    draggedCookbookId.value = null;
+    cookbookOrderBeforeDrag.value = [];
+    cookbookWasDropped.value = false;
+  }
+};
+
+const endCookbookDrag = () => {
+  if (cookbookWasDropped.value) return;
+  if (cookbookOrderBeforeDrag.value.length) {
+    recipes.state.cookbooks = cookbookOrderBeforeDrag.value;
+  }
+  draggedCookbookId.value = null;
+  cookbookOrderBeforeDrag.value = [];
+  cookbookWasDropped.value = false;
+};
+
+const cookbookStyle = (cookbook) => {
+  const color = cookbook.color || '#1D6AA3';
+  const hex = color.replace('#', '');
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  const lightColor = Number.isNaN(red) || (red * 299 + green * 587 + blue * 114) / 1000 > 160;
+  return { backgroundColor: color, color: lightColor ? '#1F2937' : '#FFFFFF' };
+};
+
+const allCookbooks = computed(() => [
+  ...new Map(
+    [...recipes.state.cookbooks, ...recipes.state.sharedCookbooks].map((cookbook) => [cookbook.id, cookbook]),
+  ).values(),
+]);
+
+const defaultCookbookId = computed(() => {
+  if (route.name === 'recipe-detail') {
+    return recipes.getRecipeById(route.params.id)?.cookbookId || '';
+  }
+
+  if (route.name === 'home') {
+    const visibleCookbooks = allCookbooks.value.filter(
+      (cookbook) => !recipes.state.excludedCookbookIds.includes(cookbook.id),
+    );
+    return visibleCookbooks[0]?.id || '';
+  }
+
+  return '';
+});
+
+const newRecipeRoute = computed(() => ({
+  name: 'recipe-new',
+  ...(defaultCookbookId.value ? { query: { cookbookId: defaultCookbookId.value } } : {}),
+}));
 
 const showSearchResults = () => {
   if (route.name !== 'home') router.push({ name: 'home' });
@@ -92,7 +205,15 @@ const showSearchResults = () => {
 
 const openNewRecipe = () => {
   sidebarOpen.value = false;
-  router.push({ name: 'recipe-new' });
+  router.push(newRecipeRoute.value);
+};
+
+const openCookbook = (cookbookId) => {
+  recipes.state.excludedCookbookIds = allCookbooks.value
+    .filter((cookbook) => cookbook.id !== cookbookId)
+    .map((cookbook) => cookbook.id);
+  sidebarOpen.value = false;
+  router.push({ name: 'home' });
 };
 
 defineEmits(['go-home']);
