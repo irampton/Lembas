@@ -2,13 +2,10 @@ import express from "express";
 import http from "node:http";
 import path from "node:path";
 import fs from "node:fs";
-import os from "node:os";
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { Server } from "socket.io";
 import { fileURLToPath } from "node:url";
-import tesseract from "node-tesseract-ocr";
-import { buildRecipeFromText } from "./LLM.js";
+import { buildRecipeFromText, listLlmModels, testLlmEndpoint } from "./LLM.js";
 import * as db from "./db.js";
 import * as auth from "./auth.js";
 import { formatQuantity } from "./src/utils/formatQuantity.js";
@@ -23,66 +20,6 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: true },
 });
-
-const tesseractConfig = { lang: "eng", oem: 1, psm: 3 };
-
-const diagnoseTesseract = () => {
-  try {
-    const result = spawnSync("tesseract", ["--version"], { encoding: "utf8" });
-    if (result.error) {
-      return `tesseract spawn error: ${result.error.message}`;
-    }
-    const out = result.stdout?.trim() || "no tesseract stdout";
-    const err = result.stderr?.trim();
-    if (err) console.error("[llm] tesseract stderr:", err);
-    return out;
-  } catch (err) {
-    return `tesseract diagnostic failed: ${err?.message || err}`;
-  }
-};
-
-const parseBase64Image = (value) => {
-  if (!value || typeof value !== "string") return null;
-  const match = value.match(/^data:(.+);base64,(.+)$/);
-  if (match) {
-    return { mime: match[1], buffer: Buffer.from(match[2], "base64") };
-  }
-  try {
-    return { mime: "application/octet-stream", buffer: Buffer.from(value, "base64") };
-  } catch (err) {
-    return null;
-  }
-};
-
-const extractTextFromImage = async (imageBase64) => {
-  const parsed = parseBase64Image(imageBase64);
-  if (!parsed) return "";
-
-  const ext = parsed.mime?.includes("png")
-    ? ".png"
-    : parsed.mime?.includes("jpeg") || parsed.mime?.includes("jpg")
-      ? ".jpg"
-      : parsed.mime?.includes("webp")
-        ? ".webp"
-        : ".img";
-
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "recipeas-ocr-"));
-  const tmpPath = path.join(tmpDir, `upload${ext}`);
-
-  fs.writeFileSync(tmpPath, parsed.buffer);
-
-  try {
-    const raw = await tesseract.recognize(tmpPath, tesseractConfig);
-    return (raw || "").toString().trim();
-  } catch (err) {
-    console.error("[llm] tesseract failed:", err?.message || err);
-    if (err?.stack) console.error(err.stack);
-    console.error("[llm] tesseract diagnostic:", diagnoseTesseract());
-    throw err;
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-};
 
 const emitFriendUpdate = (userId) => {
   if (!userId) return;
@@ -148,13 +85,48 @@ const getLlmSettings = () => {
   return {
     enabled: Boolean(raw.enabled),
     endpoint: (raw.endpoint || "").trim(),
+    model: (raw.model || "").trim(),
+    apiKey: (raw.apiKey || "").trim(),
+    visionCapable: Boolean(raw.visionCapable),
+  };
+};
+
+const getPublicLlmSettings = () => {
+  const settings = getLlmSettings();
+  return {
+    enabled: settings.enabled,
+    endpoint: settings.endpoint,
+    model: settings.model,
+    hasApiKey: Boolean(settings.apiKey),
+    visionCapable: settings.visionCapable,
+  };
+};
+
+const getRequestLlmCredentials = (body = {}) => {
+  const saved = getLlmSettings();
+  const endpoint = (body.endpoint || saved.endpoint || "").trim();
+  const mayUseSavedKey = endpoint === saved.endpoint;
+  return {
+    endpoint,
+    apiKey: (body.apiKey || (mayUseSavedKey ? saved.apiKey : "") || "").trim(),
+    model: (body.model || (mayUseSavedKey ? saved.model : "") || "").trim(),
+    visionCapable: Boolean(body.visionCapable ?? (mayUseSavedKey ? saved.visionCapable : false)),
   };
 };
 
 const bootstrapLlmSettingsFromEnv = () => {
   const envEndpoint = (process.env.LLM_ENDPOINT || "").trim();
   if (!envEndpoint) return;
-  db.setSetting("llm", { enabled: true, endpoint: envEndpoint });
+  const existing = getLlmSettings();
+  const sameEndpoint = existing.endpoint === envEndpoint;
+  db.setSetting("llm", {
+    ...existing,
+    enabled: true,
+    endpoint: envEndpoint,
+    model: (process.env.LLM_MODEL || (sameEndpoint ? existing.model : "") || "").trim(),
+    apiKey: (process.env.LLM_API_KEY || (sameEndpoint ? existing.apiKey : "") || "").trim(),
+    visionCapable: sameEndpoint ? existing.visionCapable : false,
+  });
 };
 
 if (!fs.existsSync(indexHtmlPath)) {
@@ -181,38 +153,13 @@ app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
     return;
   }
 
-  let combinedText = incomingText.trim();
-
-  if (imageBase64) {
-    try {
-      const ocrText = await extractTextFromImage(imageBase64);
-      console.log("OCR", ocrText);
-      if (ocrText) {
-        combinedText = [combinedText, ocrText].filter(Boolean).join("\n\n");
-      } else if (!combinedText) {
-        res.status(400).json({ success: false, error: "We could not read any text from that image." });
-        return;
-      }
-    } catch (error) {
-      console.error("[llm] tesseract failed:", error?.message || error);
-      if (error?.stack) console.error(error.stack);
-      if (error?.stdout) console.error("[llm] tesseract stdout:", error.stdout.toString());
-      if (error?.stderr) console.error("[llm] tesseract stderr:", error.stderr.toString());
-      res.status(500).json({
-        success: false,
-        error: "Unable to read text from the image right now (OCR backend). Check server logs for details.",
-      });
-      return;
-    }
-  }
-
-  if (!combinedText) {
-    res.status(400).json({ success: false, error: "Please provide recipe text or an image." });
+  if (imageBase64 && !llmSettings.visionCapable) {
+    res.status(400).json({ success: false, error: "The selected model does not support images." });
     return;
   }
 
   try {
-    const recipe = await buildRecipeFromText(combinedText, { endpoint: llmSettings.endpoint });
+    const recipe = await buildRecipeFromText(incomingText.trim(), { ...llmSettings, imageBase64 });
     res.json({ success: true, data: recipe });
   } catch (error) {
     console.error("[llm] import failed:", error);
@@ -221,17 +168,67 @@ app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
 });
 
 app.get("/api/settings", auth.requireAuth, (req, res) => {
-  res.json({ success: true, settings: { llm: getLlmSettings() } });
+  res.json({ success: true, settings: { llm: getPublicLlmSettings() } });
 });
 
 app.put("/api/admin/settings/llm", auth.requireAdmin, (req, res) => {
-  const { enabled, endpoint } = req.body || {};
+  const { enabled, endpoint, model, apiKey, visionCapable } = req.body || {};
+  const current = getLlmSettings();
+  const normalizedModel = (model || "").trim();
+  if (enabled && !normalizedModel) {
+    res.status(400).json({ success: false, error: "Select a model before enabling LLM import." });
+    return;
+  }
   const normalized = {
     enabled: Boolean(enabled),
     endpoint: (endpoint || "").trim(),
+    model: normalizedModel,
+    visionCapable: Boolean(visionCapable),
+    apiKey: typeof apiKey === "string" && apiKey.trim()
+      ? apiKey.trim()
+      : ((endpoint || "").trim() === current.endpoint ? current.apiKey : ""),
   };
   db.setSetting("llm", normalized);
-  res.json({ success: true, settings: { llm: normalized } });
+  res.json({ success: true, settings: { llm: getPublicLlmSettings() } });
+});
+
+app.post("/api/admin/settings/llm/test", auth.requireAdmin, async (req, res) => {
+  const credentials = getRequestLlmCredentials(req.body);
+  const { endpoint } = credentials;
+  if (!endpoint) {
+    res.status(400).json({ success: false, error: "Enter an LLM endpoint." });
+    return;
+  }
+
+  try {
+    const result = await testLlmEndpoint(endpoint, credentials);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("[llm] endpoint test failed:", error);
+    res.status(502).json({
+      success: false,
+      error: error?.message || "Unable to connect to the LLM endpoint.",
+    });
+  }
+});
+
+app.post("/api/admin/settings/llm/models", auth.requireAdmin, async (req, res) => {
+  const credentials = getRequestLlmCredentials(req.body);
+  if (!credentials.endpoint) {
+    res.status(400).json({ success: false, error: "Enter an LLM endpoint." });
+    return;
+  }
+
+  try {
+    const models = await listLlmModels(credentials.endpoint, credentials);
+    res.json({ success: true, models });
+  } catch (error) {
+    console.error("[llm] model list failed:", error);
+    res.status(502).json({
+      success: false,
+      error: error?.message || "Unable to load models from the LLM endpoint.",
+    });
+  }
 });
 
 app.post("/api/signup", auth.signupHandler);

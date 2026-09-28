@@ -1,9 +1,56 @@
 import crypto from "node:crypto";
 import { UNIT_VALUES, normalizeUnit } from "./src/mixins/units.js";
-const MODEL = "GPT-OSS-20B";
+const DEFAULT_MODEL = "GPT-OSS-20B";
+
+const usesResponsesApi = (endpoint) => {
+  try {
+    return /\/responses\/?$/i.test(new URL(endpoint).pathname);
+  } catch {
+    return false;
+  }
+};
+
+const responseText = (data) => {
+  if (typeof data?.output_text === "string") return data.output_text;
+  return (data?.output || [])
+    .flatMap((item) => item?.content || [])
+    .filter((item) => item?.type === "output_text")
+    .map((item) => item.text || "")
+    .join("");
+};
+
+const requestLlm = async (endpoint, body, { timeoutMs, apiKey } = {}) => {
+  const targetEndpoint = (endpoint || "").trim();
+  if (!targetEndpoint) throw new Error("LLM endpoint not configured.");
+
+  let response;
+  try {
+    response = await fetch(targetEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify(body),
+      ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+    });
+  } catch (error) {
+    if (error?.name === "TimeoutError") {
+      throw new Error("LLM endpoint test timed out.");
+    }
+    throw error;
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.error?.message || `LLM request failed with status ${response.status}`);
+  }
+
+  return response.json();
+};
 
 const SYSTEM_PROMPT = `You are a careful recipe extraction assistant.
-From the user's pasted text, return ONLY valid JSON with this shape:
+From the user's provided text and/or image, return ONLY valid JSON with this shape:
 {
   "title": string,
   "description": string,
@@ -123,36 +170,113 @@ const normalizeRecipe = (payload) => {
   };
 };
 
-export const buildRecipeFromText = async (text, { endpoint } = {}) => {
-  if (!text?.trim()) throw new Error("No text provided for import.");
+export const buildRecipeFromText = async (
+  text,
+  { endpoint, apiKey, model, imageBase64 } = {},
+) => {
+  if (!text?.trim() && !imageBase64) throw new Error("No recipe content provided for import.");
+  const input = text?.trim()
+    ? `Extract the recipe details from this content. Respond with JSON only.\n\n${text.trim()}`
+    : "Extract the recipe details from this image. Respond with JSON only.";
+  const responsesApi = usesResponsesApi(endpoint);
+  const body = responsesApi
+    ? {
+        model: model || DEFAULT_MODEL,
+        instructions: SYSTEM_PROMPT,
+        input: [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: input },
+              ...(imageBase64
+                ? [{ type: "input_image", image_url: imageBase64, detail: "high" }]
+                : []),
+            ],
+          },
+        ],
+        max_output_tokens: 2000,
+        store: false,
+        text: { format: { type: "json_object" } },
+      }
+    : {
+        model: model || DEFAULT_MODEL,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: imageBase64
+              ? [
+                  { type: "text", text: input },
+                  { type: "image_url", image_url: { url: imageBase64, detail: "high" } },
+                ]
+              : input,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+        response_format: { type: "json_object" },
+      };
+  const data = await requestLlm(endpoint, body, { apiKey });
+
+  const content = responsesApi
+    ? responseText(data)
+    : data?.choices?.[0]?.message?.content ?? "";
+  const parsed = jsonFromText(content);
+  return normalizeRecipe(parsed);
+};
+
+export const testLlmEndpoint = async (endpoint, { apiKey, model } = {}) => {
+  const startedAt = Date.now();
+  const responsesApi = usesResponsesApi(endpoint);
+  const data = await requestLlm(
+    endpoint,
+    responsesApi
+      ? {
+          model: model || DEFAULT_MODEL,
+          input: "Reply with OK.",
+          max_output_tokens: 128,
+          store: false,
+        }
+      : {
+          model: model || DEFAULT_MODEL,
+          messages: [{ role: "user", content: "Reply with OK." }],
+          temperature: 0,
+          max_tokens: 8,
+        },
+    { timeoutMs: 15000, apiKey },
+  );
+
+  if (responsesApi ? !responseText(data) : !data?.choices?.[0]?.message) {
+    throw new Error("LLM endpoint returned an unexpected response.");
+  }
+
+  return { latencyMs: Date.now() - startedAt };
+};
+
+export const listLlmModels = async (endpoint, { apiKey } = {}) => {
   const targetEndpoint = (endpoint || "").trim();
   if (!targetEndpoint) throw new Error("LLM endpoint not configured.");
 
-  const response = await fetch(targetEndpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Extract the recipe details from the following pasted text. Respond with JSON only.\n\n${text}`,
-        },
-      ],
-      temperature: 0.2,
-      max_tokens: 2000,
-      response_format: { type: "json_object" },
-    }),
-  });
+  const modelsUrl = new URL(targetEndpoint);
+  const trimmedPath = modelsUrl.pathname.replace(/\/+$/, "");
+  modelsUrl.pathname = /\/(chat\/completions|responses)$/i.test(trimmedPath)
+    ? trimmedPath.replace(/\/(chat\/completions|responses)$/i, "/models")
+    : `${trimmedPath}/models`;
+  modelsUrl.search = "";
+  modelsUrl.hash = "";
 
+  const response = await fetch(modelsUrl, {
+    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    signal: AbortSignal.timeout(15000),
+  });
   if (!response.ok) {
-    const msg = `LLM request failed with status ${response.status}`;
-    throw new Error(msg);
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.error?.message || `Models request failed with status ${response.status}`);
   }
 
   const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content ?? "";
-  const parsed = jsonFromText(content);
-  return normalizeRecipe(parsed);
+  return (Array.isArray(data?.data) ? data.data : [])
+    .map((item) => (typeof item === "string" ? item : item?.id))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 };

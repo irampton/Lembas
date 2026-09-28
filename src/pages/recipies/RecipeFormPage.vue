@@ -13,6 +13,15 @@
             :disabled="cookbookReadonly"
             aria-label="Cookbook"
           />
+          <RouterLink
+            v-if="!isEditing && llmAvailable"
+            :to="importRoute"
+            class="rounded-xl p-2 text-accent hover:bg-base-alt"
+            aria-label="Import recipe"
+            title="Import recipe"
+          >
+            <ArrowRightEndOnRectangleIcon class="size-6 md:size-8" aria-hidden="true" />
+          </RouterLink>
           <div class="rounded-xl p-1 pt-2 hover:bg-base-alt">
           <button
             type="submit"
@@ -235,6 +244,7 @@
 <script>
 import {
   ArrowDownTrayIcon,
+  ArrowRightEndOnRectangleIcon,
   CheckIcon,
   CheckCircleIcon,
   PlusIcon,
@@ -274,6 +284,7 @@ export default {
   components: {
     RouterLink,
     ArrowDownTrayIcon,
+    ArrowRightEndOnRectangleIcon,
     CheckIcon,
     CheckCircleIcon,
     PlusIcon,
@@ -390,6 +401,14 @@ export default {
     },
     llmAvailable() {
       return this.settingsStore.isLlmEnabled();
+    },
+    importRoute() {
+      return {
+        name: "recipe-import",
+        query: this.selectedCookbookId
+          ? { cookbookId: this.selectedCookbookId }
+          : {},
+      };
     },
     cancelRoute() {
       if (this.isShareEdit && this.shareToken)

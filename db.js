@@ -983,7 +983,7 @@ export const countOwners = () => {
 
 const sessionWithUserStmt = db.prepare(`
   SELECT sessions.id as sessionId, sessions.userId, sessions.createdAt as sessionCreatedAt, sessions.expiresAt,
-         users.id, users.username, users.role, users.createdAt
+         users.id, users.username, users.displayName, users.role, users.onboardingComplete, users.createdAt
   FROM sessions
   JOIN users ON users.id = sessions.userId
   WHERE sessions.id = ?
@@ -1007,7 +1007,9 @@ export const getSessionWithUser = (sessionId) => {
     user: {
       id: row.id,
       username: row.username,
+      displayName: row.displayName,
       role: row.role,
+      onboardingComplete: row.onboardingComplete,
       createdAt: row.createdAt,
     },
   };

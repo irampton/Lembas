@@ -13,7 +13,7 @@ const props = defineProps({
   colorType: {
     type: String,
     default: "action",
-    validator: (value) => ["action", "submit", "cancel", "delete"].includes(value),
+    validator: (value) => ["action", "submit", "cancel", "cancelAlt", "delete"].includes(value),
   },
   nativeType: {
     type: String,

@@ -14,6 +14,9 @@ const normalizeSettings = (incoming) => {
     llm: {
       enabled: Boolean(llm.enabled),
       endpoint: (llm.endpoint || '').trim(),
+      model: (llm.model || '').trim(),
+      hasApiKey: Boolean(llm.hasApiKey),
+      visionCapable: Boolean(llm.visionCapable),
     },
   };
 };
@@ -66,6 +69,23 @@ const updateLlmSettings = async (payload) => {
   }
 };
 
+const postLlmAdminAction = async (action, payload) => {
+  const res = await fetch(`/api/admin/settings/llm/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || 'Unable to connect to the LLM endpoint.');
+  }
+  return data;
+};
+
+const testLlmEndpoint = (payload) => postLlmAdminAction('test', payload);
+const loadLlmModels = (payload) => postLlmAdminAction('models', payload);
+
 const reset = () => {
   state.settings = {};
   state.loading = false;
@@ -75,12 +95,16 @@ const reset = () => {
 };
 
 const getLlmSettings = () => state.settings.llm || { enabled: false, endpoint: '' };
-const isLlmEnabled = () => Boolean(getLlmSettings().enabled) && Boolean(getLlmSettings().endpoint);
+const isLlmEnabled = () => Boolean(getLlmSettings().enabled)
+  && Boolean(getLlmSettings().endpoint)
+  && Boolean(getLlmSettings().model);
 
 export const useSettingsStore = () => ({
   state,
   loadSettings,
   updateLlmSettings,
+  testLlmEndpoint,
+  loadLlmModels,
   reset,
   getLlmSettings,
   isLlmEnabled,
