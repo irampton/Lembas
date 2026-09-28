@@ -36,6 +36,33 @@ const emitLibraryForCookbookMembers = (cookbookId) => {
   members.forEach((memberId) => emitLibraryForUser(memberId));
 };
 
+const emitRecipeUpdate = (recipe, previousCookbookId = null) => {
+  const nextMembers = new Map(
+    db.listCookbookMembers(recipe.cookbookId).map((member) => [member.userId, member]),
+  );
+  if (previousCookbookId && previousCookbookId !== recipe.cookbookId) {
+    db.listCookbookMembers(previousCookbookId).forEach(({ userId }) => {
+      if (!nextMembers.has(userId)) {
+        io.to(`user:${userId}`).emit("recipe:removed", { id: recipe.id });
+      }
+    });
+  }
+  nextMembers.forEach(({ userId, accessLevel }) => {
+    io.to(`user:${userId}`).emit("recipe:updated", {
+      ...recipe,
+      canEdit: ["recipes", "cookbook"].includes(accessLevel),
+      canManageCookbook: accessLevel === "cookbook",
+      isSharedCookbook: userId !== recipe.ownerId,
+    });
+  });
+};
+
+const emitRecipeRemoval = (recipe) => {
+  db.listCookbookMemberIds(recipe.cookbookId).forEach((userId) => {
+    io.to(`user:${userId}`).emit("recipe:removed", { id: recipe.id });
+  });
+};
+
 app.use(express.json({ limit: "10mb" }));
 app.use(auth.attachSession);
 
@@ -924,7 +951,6 @@ io.use(auth.socketAuth);
 io.on("connection", (socket) => {
   const user = socket.data.user;
   socket.join(`user:${user.id}`);
-  emitLibraryForUser(user.id);
 
   socket.on("library:list", (ack) => {
     if (typeof ack === "function") {
@@ -981,13 +1007,26 @@ io.on("connection", (socket) => {
     if (!normalized.author) {
       normalized.author = user.username || "";
     }
-    const saved = db.saveRecipe(db.ensureRecipeCookbook(normalized));
+    const saved = db.saveRecipe(normalized);
 
-    emitLibraryForCookbookMembers(cookbook.id);
-    if (previousCookbookId && previousCookbookId !== cookbook.id) {
-      emitLibraryForCookbookMembers(previousCookbookId);
-    }
+    // Acknowledge the write before generating full library payloads for every
+    // connected member. This keeps save latency independent of library size.
     reply({ success: true, data: saved });
+    setImmediate(() => emitRecipeUpdate(saved, previousCookbookId));
+  });
+
+  socket.on("recipe:get", (id, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    if (!id) {
+      reply({ success: false, error: "Missing recipe id." });
+      return;
+    }
+    const recipe = db.getRecipeForUser(id, user.id);
+    if (!recipe) {
+      reply({ success: false, error: "Recipe not found." });
+      return;
+    }
+    reply({ success: true, data: recipe });
   });
 
   socket.on("recipe:delete", (id, ack) => {
@@ -1011,8 +1050,8 @@ io.on("connection", (socket) => {
       reply({ success: false, error: "Recipe not found." });
       return;
     }
-    emitLibraryForCookbookMembers(recipe.cookbookId);
     reply({ success: true });
+    setImmediate(() => emitRecipeRemoval(recipe));
   });
 });
 

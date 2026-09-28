@@ -11,6 +11,11 @@ const resolvedDbPath = path.isAbsolute(dbPath) ? dbPath : path.join(__dirname, d
 
 const db = new Database(resolvedDbPath);
 db.pragma("journal_mode = WAL");
+// WAL + NORMAL avoids a full filesystem sync for every small write. SQLite
+// still preserves database consistency after a crash, though the latest commit
+// can be rolled back after a power loss.
+db.pragma("synchronous = NORMAL");
+db.pragma("busy_timeout = 5000");
 db.pragma("foreign_keys = ON");
 
 db.exec(`
@@ -111,6 +116,7 @@ db.exec(`
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS idx_cookbook_shares_cb ON cookbook_shares(cookbookId);
+  CREATE INDEX IF NOT EXISTS idx_cookbook_shares_user ON cookbook_shares(userId, type, cookbookId);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_public_cookbook_share_unique ON cookbook_shares(cookbookId) WHERE type = 'public';
   CREATE UNIQUE INDEX IF NOT EXISTS idx_user_cookbook_share_unique ON cookbook_shares(cookbookId, userId) WHERE type = 'user';
 
@@ -313,6 +319,26 @@ const rowToRecipe = (row) => ({
   servingsVerb: row.servingsVerb === "Serves" ? "Serves" : "Makes",
   servingsQuantity: row.servingsQuantity || "",
   servingsUnit: row.servingsUnit || "",
+});
+
+const rowToRecipeSummary = (row) => ({
+  id: row.id,
+  title: row.title,
+  description: row.description || "",
+  author: row.author || "",
+  createdAt: row.createdAt,
+  tags: parseJson(row.tags, []),
+  ingredients: parseJson(row.ingredients, []).map((ingredient) => ({
+    name: typeof ingredient === "string" ? ingredient : ingredient?.name || "",
+  })),
+  steps: parseJson(row.steps, []),
+  ownerId: row.ownerId || "",
+  cookbookId: row.cookbookId || "",
+  notes: row.notes || "",
+  servingsVerb: row.servingsVerb === "Serves" ? "Serves" : "Makes",
+  servingsQuantity: row.servingsQuantity || "",
+  servingsUnit: row.servingsUnit || "",
+  isSummary: true,
 });
 
 const serializeRecipe = (recipe) => ({
@@ -528,6 +554,47 @@ export const createUser = ({ id, username, displayName, passwordHash, role, llmA
   );
   stmt.run({ id, username, displayName: displayName || username, passwordHash, role, llmAccess: llmAccess ? 1 : 0, createdAt });
   return findUserById(id);
+};
+
+export const getRecipeForUser = (id, userId) => {
+  const row = db.prepare(`
+    SELECT r.*,
+           CASE
+             WHEN cb.ownerId = @userId THEN 1
+             WHEN COALESCE(cs.accessLevel, CASE WHEN cs.canEdit = 1 THEN 'cookbook' ELSE 'view' END)
+                  IN ('recipes', 'cookbook') THEN 1
+             ELSE 0
+           END AS userCanEdit,
+           CASE
+             WHEN cb.ownerId = @userId THEN 1
+             WHEN COALESCE(cs.accessLevel, CASE WHEN cs.canEdit = 1 THEN 'cookbook' ELSE 'view' END) = 'cookbook' THEN 1
+             ELSE 0
+           END AS userCanManageCookbook
+    FROM recipes r
+    JOIN cookbooks cb ON cb.id = r.cookbookId
+    LEFT JOIN cookbook_shares cs
+      ON cs.cookbookId = cb.id AND cs.userId = @userId AND cs.type = 'user'
+    WHERE r.id = @id
+      AND (
+        cb.ownerId = @userId
+        OR (
+          cs.id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM friends f
+            WHERE (f.userA = cb.ownerId AND f.userB = @userId)
+               OR (f.userB = cb.ownerId AND f.userA = @userId)
+          )
+        )
+      )
+  `).get({ id, userId });
+  if (!row) return null;
+  return {
+    ...rowToRecipe(row),
+    canEdit: Boolean(row.userCanEdit),
+    canManageCookbook: Boolean(row.userCanManageCookbook),
+    isSharedCookbook: row.ownerId !== userId,
+    isSummary: false,
+  };
 };
 
 export const updateUserProfile = (id, { username, displayName }) => {
@@ -937,12 +1004,16 @@ export const listSharedCookbooksForUser = (userId) => {
     JOIN cookbooks cb ON cb.id = cs.cookbookId
     JOIN users u ON u.id = cb.ownerId
     WHERE cs.type = 'user' AND cs.userId = ?
+      AND EXISTS (
+        SELECT 1
+        FROM friends f
+        WHERE (f.userA = cb.ownerId AND f.userB = cs.userId)
+           OR (f.userB = cb.ownerId AND f.userA = cs.userId)
+      )
     ORDER BY cb.displayOrder, cb.createdAt, cb.id
   `);
   const rows = stmt.all(userId) || [];
-  return rows
-    .filter((row) => row.type !== "user" || areFriends(row.ownerId, userId))
-    .map((row) => ({
+  return rows.map((row) => ({
       ...rowToCookbook(row),
       shareId: row.shareId,
       shareToken: row.token,
@@ -955,16 +1026,28 @@ export const listSharedCookbooksForUser = (userId) => {
     }));
 };
 
-export const listCookbookMemberIds = (cookbookId) => {
+export const listCookbookMembers = (cookbookId) => {
   if (!cookbookId) return [];
   const cookbook = getCookbookById(cookbookId);
-  const ids = new Set();
-  if (cookbook?.ownerId) ids.add(cookbook.ownerId);
-  const stmt = db.prepare("SELECT userId FROM cookbook_shares WHERE cookbookId = ? AND type = 'user'");
-  const rows = stmt.all(cookbookId) || [];
-  rows.forEach((row) => ids.add(row.userId));
-  return Array.from(ids);
+  if (!cookbook) return [];
+  const members = [{ userId: cookbook.ownerId, accessLevel: "cookbook" }];
+  const stmt = db.prepare(`
+    SELECT cs.userId,
+           COALESCE(cs.accessLevel, CASE WHEN cs.canEdit = 1 THEN 'cookbook' ELSE 'view' END) AS accessLevel
+    FROM cookbook_shares cs
+    WHERE cs.cookbookId = ? AND cs.type = 'user'
+      AND EXISTS (
+        SELECT 1
+        FROM friends f
+        WHERE (f.userA = ? AND f.userB = cs.userId)
+           OR (f.userB = ? AND f.userA = cs.userId)
+      )
+  `);
+  return [...members, ...stmt.all(cookbookId, cookbook.ownerId, cookbook.ownerId)];
 };
+
+export const listCookbookMemberIds = (cookbookId) =>
+  listCookbookMembers(cookbookId).map(({ userId }) => userId);
 
 export const isCookbookEditor = (cookbookId, userId) => {
   const cookbook = getCookbookById(cookbookId);
@@ -1031,12 +1114,45 @@ export const getLibraryForUser = (userId) => {
   const cookbooks = listCookbooksForOwner(userId);
   const sharedCookbooks = listSharedCookbooksForUser(userId);
   const sharedIds = new Set(sharedCookbooks.map((cb) => cb.id));
-  const accessibleCookbookIds = [...cookbooks.map((cb) => cb.id), ...sharedIds];
-  const recipes = getRecipesForCookbookIds(accessibleCookbookIds).map((recipe) => ({
-    ...recipe,
-    canEdit: recipe.ownerId === userId || isCookbookEditor(recipe.cookbookId, userId),
-    canManageCookbook: isCookbookManager(recipe.cookbookId, userId),
-    isSharedCookbook: sharedIds.has(recipe.cookbookId),
+  // Resolve access for every recipe in one query. The previous implementation
+  // ran two permission queries per recipe (plus cookbook lookups), which made
+  // library loads and post-save broadcasts progressively slower as libraries grew.
+  const recipeRows = db.prepare(`
+    SELECT r.id, r.title, r.description, r.author, r.createdAt, r.tags,
+           r.ingredients, r.steps, r.ownerId, r.cookbookId, r.notes,
+           r.servingsVerb, r.servingsQuantity, r.servingsUnit,
+           CASE
+             WHEN cb.ownerId = @userId THEN 1
+             WHEN COALESCE(cs.accessLevel, CASE WHEN cs.canEdit = 1 THEN 'cookbook' ELSE 'view' END)
+                  IN ('recipes', 'cookbook') THEN 1
+             ELSE 0
+           END AS userCanEdit,
+           CASE
+             WHEN cb.ownerId = @userId THEN 1
+             WHEN COALESCE(cs.accessLevel, CASE WHEN cs.canEdit = 1 THEN 'cookbook' ELSE 'view' END) = 'cookbook' THEN 1
+             ELSE 0
+           END AS userCanManageCookbook
+    FROM recipes r
+    JOIN cookbooks cb ON cb.id = r.cookbookId
+    LEFT JOIN cookbook_shares cs
+      ON cs.cookbookId = cb.id AND cs.userId = @userId AND cs.type = 'user'
+    WHERE cb.ownerId = @userId
+       OR (
+         cs.id IS NOT NULL
+         AND EXISTS (
+           SELECT 1
+           FROM friends f
+           WHERE (f.userA = cb.ownerId AND f.userB = @userId)
+              OR (f.userB = cb.ownerId AND f.userA = @userId)
+         )
+       )
+    ORDER BY r.title COLLATE NOCASE
+  `).all({ userId });
+  const recipes = recipeRows.map((row) => ({
+    ...rowToRecipeSummary(row),
+    canEdit: Boolean(row.userCanEdit),
+    canManageCookbook: Boolean(row.userCanManageCookbook),
+    isSharedCookbook: sharedIds.has(row.cookbookId),
   }));
   return { cookbooks, sharedCookbooks, recipes };
 };

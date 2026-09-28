@@ -126,7 +126,20 @@ const recipes = computed(() => {
   return store.state.recipes.filter((recipe) => {
     if (!isCookbookSelected(recipe.cookbookId)) return false;
     if ((recipe.tags || []).some((tag) => isTagSelected(tagName(tag))) === false && hasTagFilter.value) return false;
-    const searchable = [recipe.title, ...(recipe.ingredients || []).map((item) => typeof item === 'string' ? item : item.name), ...(recipe.tags || []).map((tag) => typeof tag === 'string' ? tag : tag.name)];
+    const cookbookName = cookbookById.value.get(recipe.cookbookId)?.name || '';
+    const searchable = [
+      recipe.title,
+      recipe.description,
+      recipe.author,
+      recipe.servingsVerb,
+      recipe.servingsQuantity,
+      recipe.servingsUnit,
+      cookbookName,
+      recipe.notes,
+      ...(recipe.ingredients || []).map((item) => typeof item === 'string' ? item : item.name),
+      ...(recipe.tags || []).map((tag) => typeof tag === 'string' ? tag : tag.name),
+      ...(recipe.steps || []),
+    ];
     return !query || searchable.join(' ').toLocaleLowerCase().includes(query);
   }).sort((a, b) => {
     const comparison = sortBy.value === 'createdAt' ? dateValue(a) - dateValue(b) : compareNames(a.title, b.title);

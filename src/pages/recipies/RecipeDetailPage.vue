@@ -1,6 +1,6 @@
 <template>
   <div class="p-4 md:px-[20%]">
-    <div v-if="!isShareRoute && store.state.loading && !store.state.ready">
+    <div v-if="!isShareRoute && ((store.state.loading && !store.state.ready) || detailLoading)">
       Loading recipe…
     </div>
 
@@ -8,13 +8,13 @@
       <p>Loading shared recipe…</p>
     </div>
 
-    <div v-else-if="!recipe && !isShareRoute">
-      <p>404: Recipe not found</p>
+    <div v-else-if="shareError || detailError">
+      <p>Unable to load recipe</p>
+      <p>{{ shareError || detailError }}</p>
     </div>
 
-    <div v-else-if="shareError">
-      <p>Unable to load shared recipe</p>
-      <p>{{ shareError }}</p>
+    <div v-else-if="!recipe && !isShareRoute">
+      <p>404: Recipe not found</p>
     </div>
 
     <div v-else>
@@ -140,6 +140,8 @@ const route = useRoute();
 const sharedRecipe = ref(null);
 const shareError = ref(null);
 const shareLoading = ref(false);
+const detailLoading = ref(false);
+const detailError = ref(null);
 const isShareRoute = computed(() => route.name === "recipe-share-view");
 const shareToken = computed(() => route.params.token);
 
@@ -225,9 +227,28 @@ const loadSharedRecipe = async () => {
   }
 };
 
+const loadRecipe = async () => {
+  if (isShareRoute.value || !route.params.id) return;
+  detailLoading.value = true;
+  detailError.value = null;
+  try {
+    await store.loadRecipe(route.params.id);
+  } catch (error) {
+    detailError.value = error.message || "Unable to load recipe.";
+  } finally {
+    detailLoading.value = false;
+  }
+};
+
 watch(
   () => shareToken.value,
   () => loadSharedRecipe(),
+  { immediate: true },
+);
+
+watch(
+  () => route.params.id,
+  () => loadRecipe(),
   { immediate: true },
 );
 </script>

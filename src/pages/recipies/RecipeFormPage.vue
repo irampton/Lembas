@@ -26,7 +26,7 @@
           <button
             type="submit"
             class="text-green-600 disabled:opacity-40"
-            :disabled="isSaving || (isShareEdit && !sharedRecipe)"
+            :disabled="isSaving || isRecipeLoading || (isShareEdit && !sharedRecipe)"
             :aria-label="isSaving ? 'Saving recipe' : 'Save recipe'"
             :title="isSaving ? 'Saving…' : 'Save recipe'"
           >
@@ -241,7 +241,7 @@
         <BaseButton
           colorType="submit"
           native-type="submit"
-          :disabled="isSaving || isDeleting || (isShareEdit && !sharedRecipe)"
+          :disabled="isSaving || isRecipeLoading || isDeleting || (isShareEdit && !sharedRecipe)"
         >
           {{ isSaving ? "Saving…" : "Save" }}
         </BaseButton>
@@ -352,6 +352,7 @@ export default {
       tagInput: "",
       isTagInputVisible: false,
       isSaving: false,
+      isRecipeLoading: false,
       isDeleting: false,
       showDeleteConfirmation: false,
       deleteError: null,
@@ -464,7 +465,11 @@ export default {
   },
   watch: {
     currentRecipe: {
-      handler() {
+      handler(recipe) {
+        if (recipe?.isSummary) {
+          this.loadFullRecipe(recipe.id);
+          return;
+        }
         this.hydrateForm();
       },
       immediate: true,
@@ -499,6 +504,18 @@ export default {
     this.loadSharedRecipe();
   },
   methods: {
+    async loadFullRecipe(id) {
+      if (!id || this.isShareEdit || this.isRecipeLoading) return;
+      this.isRecipeLoading = true;
+      this.shareError = null;
+      try {
+        await this.store.loadRecipe(id);
+      } catch (error) {
+        this.shareError = error.message || "Unable to load recipe.";
+      } finally {
+        this.isRecipeLoading = false;
+      }
+    },
     applyDraft(data, { replaceExisting = false } = {}) {
       if (!data) return;
       const setField = (key, value) => {

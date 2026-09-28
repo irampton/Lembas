@@ -3,6 +3,7 @@ import socket from '../services/socket';
 
 const state = reactive({
   recipes: [],
+  recipeDetails: {},
   sharedRecipes: [],
   cookbooks: [],
   sharedCookbooks: [],
@@ -25,15 +26,75 @@ const sortByDisplayOrder = (list) =>
 
 const applyLibrary = (payload) => {
   if (!payload) return;
-  state.recipes = sortByTitle(payload.recipes || []);
+  const recipes = payload.recipes || [];
+  const summariesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  Object.keys(state.recipeDetails).forEach((id) => {
+    if (!summariesById.has(id)) {
+      delete state.recipeDetails[id];
+      return;
+    }
+    const summary = summariesById.get(id);
+    state.recipeDetails[id] = {
+      ...state.recipeDetails[id],
+      canEdit: summary.canEdit,
+      canManageCookbook: summary.canManageCookbook,
+      isSharedCookbook: summary.isSharedCookbook,
+      cookbookId: summary.cookbookId,
+    };
+  });
+  state.recipes = sortByTitle(recipes);
   state.cookbooks = sortByDisplayOrder(payload.cookbooks || []);
   state.sharedCookbooks = sortByDisplayOrder(payload.sharedCookbooks || []);
   state.ready = true;
 };
 
+const applyRecipe = (recipe) => {
+  if (!recipe?.id) return;
+  if (!recipe.isSummary) {
+    state.recipeDetails[recipe.id] = recipe;
+  }
+  const summary = recipe.isSummary ? recipe : {
+    ...recipe,
+    ingredients: (recipe.ingredients || []).map((ingredient) => ({ name: ingredient?.name || '' })),
+    isSummary: true,
+  };
+  state.recipes = sortByTitle(state.recipes.some((item) => item.id === summary.id)
+    ? state.recipes.map((item) => item.id === summary.id ? { ...item, ...summary } : item)
+    : [...state.recipes, summary]);
+};
+
+const removeRecipe = (id) => {
+  if (!id) return;
+  state.recipes = state.recipes.filter((recipe) => recipe.id !== id);
+  delete state.recipeDetails[id];
+};
+
+const recipeRequests = new Map();
+
+const loadRecipe = (id, { force = false } = {}) => {
+  if (!id) return Promise.reject(new Error('Missing recipe id.'));
+  if (!force && state.recipeDetails[id]) return Promise.resolve(state.recipeDetails[id]);
+  if (recipeRequests.has(id)) return recipeRequests.get(id);
+  const request = new Promise((resolve, reject) => {
+    socket.emit('recipe:get', id, (response) => {
+      if (response?.success) {
+        applyRecipe(response.data);
+        resolve(state.recipeDetails[id]);
+      } else {
+        reject(new Error(response?.error || 'Unable to load recipe.'));
+      }
+    });
+  }).finally(() => recipeRequests.delete(id));
+  recipeRequests.set(id, request);
+  return request;
+};
+
 socket.on('library:updated', (payload) => {
   applyLibrary(payload);
 });
+
+socket.on('recipe:updated', applyRecipe);
+socket.on('recipe:removed', ({ id } = {}) => removeRecipe(id));
 
 socket.on('connect', () => {
   if (!state.ready) {
@@ -80,7 +141,20 @@ const saveRecipe = (recipe) =>
     state.error = null;
     socket.emit('recipe:save', recipe, (response) => {
       if (response?.success) {
-        resolve(response.data);
+        const saved = response.data;
+        const existing = state.recipes.find((item) => item.id === saved.id);
+        const sharedCookbook = state.sharedCookbooks.find((item) => item.id === saved.cookbookId);
+        const savedWithPermissions = {
+          ...existing,
+          ...saved,
+          isSummary: false,
+          canEdit: true,
+          canManageCookbook: state.cookbooks.some((item) => item.id === saved.cookbookId)
+            || Boolean(sharedCookbook?.canManageCookbook),
+          isSharedCookbook: Boolean(sharedCookbook),
+        };
+        applyRecipe(savedWithPermissions);
+        resolve(savedWithPermissions);
       } else {
         const err = response?.error || 'Unable to save recipe.';
         state.error = err;
@@ -95,6 +169,7 @@ const deleteRecipe = (id) =>
     state.error = null;
     socket.emit('recipe:delete', id, (response) => {
       if (response?.success) {
+        removeRecipe(id);
         resolve(true);
       } else {
         const err = response?.error || 'Unable to delete recipe.';
@@ -162,7 +237,7 @@ const deleteCookbook = async (id, options) => {
   state.excludedCookbookIds = state.excludedCookbookIds.filter((cookbookId) => cookbookId !== id);
 };
 
-const getRecipeById = (id) => state.recipes.find((recipe) => recipe.id === id);
+const getRecipeById = (id) => state.recipeDetails[id] || state.recipes.find((recipe) => recipe.id === id);
 const getSharedRecipeById = (id) => state.sharedRecipes.find((recipe) => recipe.id === id);
 const getCookbookById = (id) =>
   state.cookbooks.find((cb) => cb.id === id) || state.sharedCookbooks.find((cb) => cb.id === id);
@@ -172,6 +247,7 @@ export const useRecipeStore = () => ({
   loadRecipes: loadLibrary,
   loadLibrary,
   loadSharedRecipes,
+  loadRecipe,
   saveRecipe,
   deleteRecipe,
   saveCookbook,
@@ -182,6 +258,7 @@ export const useRecipeStore = () => ({
   getCookbookById,
   reset: () => {
     state.recipes = [];
+    state.recipeDetails = {};
     state.sharedRecipes = [];
     state.cookbooks = [];
     state.sharedCookbooks = [];
