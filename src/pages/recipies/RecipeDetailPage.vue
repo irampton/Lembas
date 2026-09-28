@@ -46,21 +46,39 @@
 
       <div class="flex flex-col md:flex-row">
         <div class="md:w-fit md:pr-2">
-          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2 pr-8">
+          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="font-bold text-base-dark text-3xl pb-2">
               Ingredients
+            </div>
+            <div class="flex items-center justify-between gap-3 pb-3 text-accent" aria-label="Recipe quantity">
+              <div class="flex flex-row items-center">
+                <button type="button" class="rounded-lg p-1 hover:bg-base" :disabled="multiplierIndex === 0"
+                  aria-label="Decrease recipe quantity" @click="decreaseMultiplier">
+                  <ChevronDoubleLeftIcon class="size-5" />
+                </button>
+                <span class="min-w-10 text-center font-bold text-base-dark" aria-live="polite">
+                  {{ multiplierLabel }}
+                </span>
+                <button type="button" class="rounded-lg p-1 hover:bg-base"
+                  :disabled="multiplierIndex === MULTIPLIERS.length - 1" aria-label="Increase recipe quantity"
+                  @click="increaseMultiplier">
+                  <ChevronDoubleRightIcon class="size-5" />
+                </button>
+              </div>
+              <BaseSplitButton v-model="unitSystem" :options="unitSystemOptions" color-type="action"
+                class="[&>button]:h-7 [&>button]:px-2 [&>button]:text-xs" aria-label="Measurement system" />
             </div>
             <div>
               <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index"
                 class="flex flex-row">
                 <div class="w-10 shrink-0 text-right mr-1">
                   <span class="text-light">{{
-                    ingredient.quantity
+                    scaledIngredient(ingredient).quantity
                   }}</span>
                 </div>
                 <div class="w-10 shrink-0 text-left mr-3">
                   <span class="text-light">{{
-                    formatUnit(ingredient.unit, ingredient.quantity) || "&nbsp;"
+                    scaledIngredient(ingredient).unit || "&nbsp;"
                   }}</span>
                 </div>
                 <div class="md:min-w-30">
@@ -123,10 +141,11 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-import { PencilIcon, ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
+import { PencilIcon, ArrowUpOnSquareIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from "@heroicons/vue/24/outline";
 import BaseTag from "../../baseComponents/BaseTag.vue";
+import BaseSplitButton from "../../baseComponents/BaseSplitButton.vue";
 import { useRecipeStore } from "../../stores/recipeStore.js";
-import { formatUnit } from "../../mixins/units.js";
+import { formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
 
 const store = useRecipeStore();
 const route = useRoute();
@@ -136,6 +155,13 @@ const shareError = ref(null);
 const shareLoading = ref(false);
 const detailLoading = ref(false);
 const detailError = ref(null);
+const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8]);
+const multiplierIndex = ref(MULTIPLIERS.indexOf(1));
+const unitSystem = ref("customary");
+const unitSystemOptions = Object.freeze([
+  { value: "customary", label: "C" },
+  { value: "metric", label: "mL" },
+]);
 const isShareRoute = computed(() => route.name === "recipe-share-view");
 const shareToken = computed(() => route.params.token);
 
@@ -180,11 +206,101 @@ const cookbookPillStyle = computed(() => {
 
 const servingSize = computed(() => {
   const verb = recipe.value?.servingsVerb === "Serves" ? "Serves" : "Makes";
-  const quantity = recipe.value?.servingsQuantity?.toString?.().trim() || "";
+  const originalQuantity = recipe.value?.servingsQuantity?.toString?.().trim() || "";
+  const parsedQuantity = parseQuantity(originalQuantity);
+  const quantity = Number.isFinite(parsedQuantity)
+    ? formatQuantity(parsedQuantity * multiplier.value)
+    : originalQuantity;
   const unit = recipe.value?.servingsUnit?.toString?.().trim() || "";
   const combined = [quantity, unit].filter(Boolean).join(" ").trim();
   return combined ? `${verb} ${combined}` : "";
 });
+
+const multiplier = computed(() => MULTIPLIERS[multiplierIndex.value]);
+const multiplierLabel = computed(() => `${formatQuantity(multiplier.value)}x`);
+const increaseMultiplier = () => {
+  multiplierIndex.value = Math.min(multiplierIndex.value + 1, MULTIPLIERS.length - 1);
+};
+const decreaseMultiplier = () => {
+  multiplierIndex.value = Math.max(multiplierIndex.value - 1, 0);
+};
+
+const FRACTIONS = Object.freeze({
+  "1/2": "½", "1/3": "⅓", "2/3": "⅔", "1/4": "¼", "3/4": "¾",
+  "1/5": "⅕", "2/5": "⅖", "3/5": "⅗", "4/5": "⅘", "1/6": "⅙",
+  "5/6": "⅚", "1/7": "⅐", "1/8": "⅛", "3/8": "⅜", "5/8": "⅝", "7/8": "⅞",
+});
+const FRACTION_DENOMINATORS = [2, 3, 4, 5, 6, 7, 8];
+
+const formatQuantity = (amount) => {
+  if (!Number.isFinite(amount)) return "";
+  const whole = Math.floor(amount + 0.000001);
+  const remainder = amount - whole;
+  let closest = null;
+  for (const denominator of FRACTION_DENOMINATORS) {
+    const numerator = Math.round(remainder * denominator);
+    const value = numerator / denominator;
+    if (numerator && numerator < denominator && (!closest || Math.abs(remainder - value) < closest.difference)) {
+      closest = { numerator, denominator, difference: Math.abs(remainder - value) };
+    }
+  }
+  if (closest && closest.difference < 0.035) {
+    const fraction = FRACTIONS[`${closest.numerator}/${closest.denominator}`];
+    if (fraction) return whole ? `${whole}${fraction}` : fraction;
+  }
+  if (Math.abs(remainder) < 0.000001) return `${whole}`;
+  return `${Math.round(amount * 100) / 100}`;
+};
+
+const readableVolume = (amount) => {
+  // Recipe quantities stay in familiar cups below a gallon. Quarts are useful
+  // for one to three gallons; above that, gallons are easier to scan.
+  const targets = [
+    ["gal", 3785.411784, 3], ["qt", 946.352946, 4],
+    ["cup", 236.5882365, 1 / 3], ["fl oz", 29.5735295625, 1],
+    ["tbsp", 14.78676478125, 1], ["tsp", 4.92892159375, 0],
+  ];
+  return targets.find(([, milliliters, minimum]) => amount / milliliters >= minimum) || targets.at(-1);
+};
+
+const readableCustomaryUnit = (amount, dimension) => {
+  if (dimension === "volume") return readableVolume(amount);
+  if (dimension === "mass") {
+    return amount >= 453.59237 ? ["lb", 453.59237] : amount >= 28.349523125 ? ["oz", 28.349523125] : ["g", 1];
+  }
+  if (dimension === "length") return amount >= 25.4 ? ["in", 25.4] : ["mm", 1];
+  return null;
+};
+
+const readableMetricUnit = (amount, dimension) => {
+  if (dimension === "volume") return amount >= 1000 ? ["l", 1000] : ["ml", 1];
+  if (dimension === "mass") return amount >= 1000 ? ["kg", 1000] : amount >= 1 ? ["g", 1] : ["mg", 0.001];
+  if (dimension === "length") return amount >= 10 ? ["cm", 10] : ["mm", 1];
+  return null;
+};
+
+const scaledIngredient = (ingredient) => {
+  const original = ingredient.quantity?.toString?.().trim() || "";
+  const amount = parseQuantity(original);
+  if (!Number.isFinite(amount)) return { quantity: original, unit: formatUnit(ingredient.unit, original) };
+  const scaledAmount = amount * multiplier.value;
+  const definition = getUnit(ingredient.unit);
+  if (definition?.conversion) {
+    const baseAmount = scaledAmount * definition.conversion.factor;
+    const target = unitSystem.value === "metric"
+      ? readableMetricUnit(baseAmount, definition.dimension)
+      : readableCustomaryUnit(baseAmount, definition.dimension);
+    if (!target) {
+      const quantity = formatQuantity(scaledAmount);
+      return { quantity, unit: formatUnit(ingredient.unit, quantity) };
+    }
+    const [unit, factor] = target;
+    const quantity = formatQuantity(baseAmount / factor);
+    return { quantity, unit: formatUnit(unit, quantity) };
+  }
+  const quantity = formatQuantity(scaledAmount);
+  return { quantity, unit: formatUnit(ingredient.unit, quantity) };
+};
 
 const formattedDate = computed(() => {
   if (!recipe.value?.createdAt) return "";

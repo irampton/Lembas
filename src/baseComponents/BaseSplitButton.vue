@@ -1,6 +1,6 @@
 <template>
   <div
-    class="inline-flex rounded-full bg-gray-200 p-1"
+    class="inline-flex rounded-full bg-base p-1"
     :class="$attrs.class"
     role="radiogroup"
     :aria-label="ariaLabel"
@@ -42,7 +42,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'change']);
 const buttonRefs = new Map();
 const selectedClasses = {
-  action: 'bg-primary text-white shadow-sm',
+  action: 'bg-accent text-white shadow-sm',
   submit: 'bg-accent text-white shadow-sm',
   cancel: 'bg-base-alt text-black shadow-sm',
   cancelAlt: 'bg-white text-black shadow-sm',
