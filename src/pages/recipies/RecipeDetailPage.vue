@@ -99,7 +99,7 @@
           </div>
         </div>
       </div>
-      <div>
+      <div v-if="hasNotes">
         <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
           <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
           {{ recipe.notes }}
@@ -113,7 +113,7 @@
         <div class="font-bold text-base-dark text-3xl py-3">History</div>
       </div>
       -->
-      <div>
+      <div v-if="hasTags">
         <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 md:mt-4 m-2">
           <div class="flex flex-row flex-wrap gap-2">
             <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
@@ -150,6 +150,14 @@ const recipe = computed(() =>
 );
 const canEditRecipe = computed(
   () => !isShareRoute.value && recipe.value?.canEdit !== false,
+);
+const hasNotes = computed(() => Boolean(recipe.value?.notes?.toString().trim()));
+const hasTags = computed(() =>
+  (recipe.value?.tags || []).some((tag) =>
+    Boolean(
+      (typeof tag === "string" ? tag : tag?.name)?.toString().trim(),
+    ),
+  ),
 );
 const recipeCookbook = computed(() =>
   recipe.value?.cookbookId
