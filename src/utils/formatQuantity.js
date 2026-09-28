@@ -19,19 +19,27 @@ const unicodeFractions = {
   "1/10": "⅒",
 };
 
+const superscriptDigits = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+const subscriptDigits = "₀₁₂₃₄₅₆₇₈₉";
+const toSuperscript = (value) =>
+  String(value).replace(/\d/g, (digit) => superscriptDigits[digit]);
+const toSubscript = (value) =>
+  String(value).replace(/\d/g, (digit) => subscriptDigits[digit]);
+const formatFraction = (fraction) => {
+  const [numerator, denominator] = fraction.split("/");
+  return unicodeFractions[fraction] || `${toSuperscript(numerator)}⁄${toSubscript(denominator)}`;
+};
+
 const asciiFractionPattern = new RegExp(
-  `(?<![\\d/])(${Object.keys(unicodeFractions)
-    .sort((a, b) => b.length - a.length)
-    .map((fraction) => fraction.replace("/", "\\/"))
-    .join("|")})(?![\\d/])`,
+  "(?<![\\d/])(\\d+\\/\\d+)(?![\\d/])",
   "g",
 );
 const unicodeFractionPattern = new RegExp(
-  `\\s+(?=[${Object.values(unicodeFractions).join("")}])`,
+  `\\s+(?=[${Object.values(unicodeFractions).join("")}]|[${superscriptDigits}]+⁄[${subscriptDigits}]+)`,
   "g",
 );
 
 export const formatQuantity = (value) =>
   String(value ?? "")
-    .replace(asciiFractionPattern, (fraction) => unicodeFractions[fraction])
+    .replace(asciiFractionPattern, formatFraction)
     .replace(unicodeFractionPattern, "");

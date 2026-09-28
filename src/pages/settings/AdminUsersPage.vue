@@ -94,8 +94,11 @@
             <li v-for="code in state.joinCodes" :key="code.code"
               class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 md:px-6">
               <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2"><code
-                    class="font-bold tracking-wider text-base-dark">{{ printableCode(code.code) }}</code><span
+                <div class="flex flex-wrap items-center gap-2"><button type="button"
+                    class="rounded px-1 font-bold tracking-wider text-base-dark hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    :aria-label="`${state.copiedCode === code.code ? 'Copied' : 'Copy'} join code ${printableCode(code.code)}`"
+                    :title="state.copiedCode === code.code ? 'Copied' : 'Copy join code'" @click="copyJoinCode(code.code)"><code>{{ printableCode(code.code) }}</code><span
+                      v-if="state.copiedCode === code.code" class="ml-1 text-xs font-normal text-primary">Copied</span></button><span
                     class="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold capitalize text-primary">{{
                     code.role }}</span></div>
                 <p class="mt-1 text-xs text-light">{{ code.usedCount }} / {{ code.maxUses }} used · {{ code.expiresAt ?
@@ -147,6 +150,7 @@ const state = reactive({
   expiresAt: '',
   loading: false,
   generating: false,
+  copiedCode: '',
   error: null,
 });
 
@@ -261,6 +265,31 @@ onMounted(() => {
 
 const printableCode = (code) => `${code.slice(0, 4)}-${code.slice(4)}`;
 const formatDate = (value) => new Date(value).toLocaleDateString();
+
+const copyJoinCode = async (code) => {
+  const value = printableCode(code);
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.append(input);
+      input.select();
+      const copied = document.execCommand('copy');
+      input.remove();
+      if (!copied) throw new Error('Clipboard access is unavailable.');
+    }
+    state.copiedCode = code;
+    window.setTimeout(() => {
+      if (state.copiedCode === code) state.copiedCode = '';
+    }, 2000);
+  } catch (error) {
+    state.error = error.message || 'Unable to copy join code.';
+  }
+};
 
 const removeCode = async (code) => {
   if (!window.confirm('Delete this code?')) return;

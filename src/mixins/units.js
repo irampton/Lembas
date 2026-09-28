@@ -72,6 +72,18 @@ UNITS.forEach((definition) => {
 export const getUnit = (value) => unitLookup.get(cleanUnit(value));
 export const normalizeUnit = (value) => getUnit(value)?.value || '';
 
+// Keep programmatically populated unit inputs consistent with the label that
+// UnitAutocomplete commits when a user leaves the field.
+export const normalizeUnitAutocompleteValue = (value) => {
+  const input = (value ?? '').toString();
+  const lowered = input.trim().toLowerCase();
+  const match = UNITS.find((definition) =>
+    [definition.name, definition.abbreviation]
+      .some((candidate) => candidate.toLowerCase() === lowered),
+  );
+  return match?.name || input;
+};
+
 const unicodeFractions = Object.freeze({
   '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4',
   '⅕': '1/5', '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6',
@@ -79,11 +91,29 @@ const unicodeFractions = Object.freeze({
   '⅞': '7/8', '⅑': '1/9', '⅒': '1/10',
 });
 
+const superscriptDigitValues = Object.freeze({
+  '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+  '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
+});
+const subscriptDigitValues = Object.freeze({
+  '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4',
+  '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9',
+});
+const composedUnicodeFractionPattern = /([⁰¹²³⁴⁵⁶⁷⁸⁹]+)⁄([₀₁₂₃₄₅₆₇₈₉]+)/g;
+const fromUnicodeDigits = (value, values) =>
+  [...value].map((digit) => values[digit]).join('');
+
 export const parseQuantity = (quantity) => {
-  const normalized = (quantity || '').toString().replace(
-    /[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞⅑⅒]/g,
-    (fraction) => ` ${unicodeFractions[fraction]} `,
-  );
+  const normalized = (quantity || '').toString()
+    .replace(
+      composedUnicodeFractionPattern,
+      (_, numerator, denominator) =>
+        ` ${fromUnicodeDigits(numerator, superscriptDigitValues)}/${fromUnicodeDigits(denominator, subscriptDigitValues)} `,
+    )
+    .replace(
+      /[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞⅑⅒]/g,
+      (fraction) => ` ${unicodeFractions[fraction]} `,
+    );
   const parts = normalized.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return null;
   let total = 0;

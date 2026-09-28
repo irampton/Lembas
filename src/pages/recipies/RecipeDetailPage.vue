@@ -208,9 +208,9 @@ const servingSize = computed(() => {
   const verb = recipe.value?.servingsVerb === "Serves" ? "Serves" : "Makes";
   const originalQuantity = recipe.value?.servingsQuantity?.toString?.().trim() || "";
   const parsedQuantity = parseQuantity(originalQuantity);
-  const quantity = Number.isFinite(parsedQuantity)
-    ? formatQuantity(parsedQuantity * multiplier.value)
-    : originalQuantity;
+  const quantity = multiplier.value === 1 || !Number.isFinite(parsedQuantity)
+    ? originalQuantity
+    : formatQuantity(parsedQuantity * multiplier.value);
   const unit = recipe.value?.servingsUnit?.toString?.().trim() || "";
   const combined = [quantity, unit].filter(Boolean).join(" ").trim();
   return combined ? `${verb} ${combined}` : "";
@@ -281,6 +281,9 @@ const readableMetricUnit = (amount, dimension) => {
 
 const scaledIngredient = (ingredient) => {
   const original = ingredient.quantity?.toString?.().trim() || "";
+  if (multiplier.value === 1) {
+    return { quantity: original, unit: formatUnit(ingredient.unit, original) };
+  }
   const amount = parseQuantity(original);
   if (!Number.isFinite(amount)) return { quantity: original, unit: formatUnit(ingredient.unit, original) };
   const scaledAmount = amount * multiplier.value;

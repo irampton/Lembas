@@ -9,7 +9,7 @@
 
 <script setup>
 import BaseAutocomplete from "./BaseAutocomplete.vue";
-import { UNITS } from "../mixins/units.js";
+import { UNITS, normalizeUnitAutocompleteValue } from "../mixins/units.js";
 
 defineProps({
   modelValue: {
@@ -26,12 +26,6 @@ const unitOptions = UNITS.map((unit) => ({
   keywords: [unit.abbreviation],
 }));
 
-const normalize = (value) => {
-  const lowered = value.trim().toLowerCase();
-  const match = UNITS.find((unit) =>
-    [unit.name, unit.abbreviation]
-      .some((candidate) => candidate.toLowerCase() === lowered),
-  );
-  emit("update:modelValue", match?.name || value);
-};
+const normalize = (value) =>
+  emit("update:modelValue", normalizeUnitAutocompleteValue(value));
 </script>

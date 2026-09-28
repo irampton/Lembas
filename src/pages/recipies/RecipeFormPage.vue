@@ -294,6 +294,7 @@ import BaseTag from "../../baseComponents/BaseTag.vue";
 import BasePopup from "../../baseComponents/BasePopup.vue";
 import UnitAutocomplete from "../../baseComponents/UnitAutocomplete.vue";
 import { formatQuantity } from "../../utils/formatQuantity.js";
+import { normalizeUnitAutocompleteValue } from "../../mixins/units.js";
 
 const today = new Date().toISOString().slice(0, 10);
 const makeId = () =>
@@ -483,7 +484,10 @@ export default {
     "store.state.importedDraft": {
       handler(draft) {
         if (!draft || this.isEditing) return;
-        this.applyDraft(draft, { replaceExisting: true });
+        this.applyDraft(draft, {
+          replaceExisting: true,
+          normalizeIngredientUnits: true,
+        });
         this.store.consumeImportedDraft();
       },
       immediate: true,
@@ -516,7 +520,7 @@ export default {
         this.isRecipeLoading = false;
       }
     },
-    applyDraft(data, { replaceExisting = false } = {}) {
+    applyDraft(data, { replaceExisting = false, normalizeIngredientUnits = false } = {}) {
       if (!data) return;
       const setField = (key, value) => {
         if (replaceExisting || value) {
@@ -542,7 +546,9 @@ export default {
         id: item.id || makeId(),
         name: item.name || "",
         quantity: item.quantityRaw ?? item.quantity ?? "",
-        unit: item.unit || "",
+        unit: normalizeIngredientUnits
+          ? normalizeUnitAutocompleteValue(item.unit)
+          : item.unit || "",
       }));
       if (replaceExisting || nextIngredients.length) {
         this.form.ingredients = nextIngredients.length
