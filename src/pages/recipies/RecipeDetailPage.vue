@@ -26,9 +26,7 @@
             {{ recipeCookbook.name }}
           </div>
           <div class="rounded-xl p-1 hover:bg-base-alt">
-            <RouterLink 
-            v-if="canEditRecipe" 
-            :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
+            <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
               aria-label="Edit recipe">
               <PencilIcon class="size-6 md:size-8" />
             </RouterLink>
@@ -47,29 +45,25 @@
       </div>
 
       <div class="flex flex-col md:flex-row">
-
         <div class="md:w-fit md:pr-2">
           <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2 pr-8">
             <div class="font-bold text-base-dark text-3xl pb-2">
               Ingredients
             </div>
-            <div class="flex flex-row">
-              <div class="shrink-0 text-right">
-                <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index">
+            <div>
+              <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index"
+                class="flex flex-row">
+                <div class="w-10 shrink-0 text-right mr-1">
                   <span class="text-light">{{
                     ingredient.quantity
                   }}</span>
                 </div>
-              </div>
-              <div class="pl-2 shrink-0 text-left">
-                <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index">
+                <div class="w-10 shrink-0 text-left mr-3">
                   <span class="text-light">{{
                     formatUnit(ingredient.unit, ingredient.quantity) || "&nbsp;"
                   }}</span>
                 </div>
-              </div>
-              <div class="pl-2 shrink-0">
-                <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index">
+                <div class="md:min-w-30">
                   <span class="text-left text-base-dark">{{
                     ingredient.name
                   }}</span>
