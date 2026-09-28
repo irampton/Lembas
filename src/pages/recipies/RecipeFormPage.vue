@@ -354,7 +354,7 @@ export default {
         ownerUsername: "You",
       }));
       const editableShared = (this.store.state.sharedCookbooks || []).filter(
-        (cb) => cb.canEdit,
+        (cb) => cb.accessLevel === "cookbook" || (this.isEditing && cb.id === this.currentRecipe?.cookbookId),
       );
       return [...owned, ...editableShared];
     },

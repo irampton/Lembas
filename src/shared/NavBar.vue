@@ -107,6 +107,15 @@
           <p v-if="recipes.state.ready && !recipes.state.cookbooks.length" class="px-3 py-2 text-sm text-light">
             No cookbooks yet.
           </p>
+          <template v-if="recipes.state.sharedCookbooks.length">
+            <p class="mt-4 px-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Shared with you</p>
+            <div v-for="cookbook in recipes.state.sharedCookbooks" :key="cookbook.id" class="mb-2 mt-2 flex w-full items-center rounded-2xl drop-shadow-lg" :style="cookbookStyle(cookbook)">
+              <button type="button" class="min-w-0 grow truncate px-3 py-2 text-left font-semibold" @click="openCookbook(cookbook.id)">{{ cookbook.name }}</button>
+              <button v-if="cookbook.accessLevel === 'cookbook'" type="button" class="shrink-0 rounded-full p-2 hover:bg-black/10" :aria-label="`Edit ${cookbook.name}`" @click="editCookbook = cookbook">
+                <Cog6ToothIcon class="size-5" />
+              </button>
+            </div>
+          </template>
         </nav>
       </BaseSidebar>
     </Transition>
@@ -209,18 +218,22 @@ const allCookbooks = computed(() => [
 ]);
 
 const defaultCookbookId = computed(() => {
+  const canAddRecipes = (cookbook) => cookbook && (
+    recipes.state.cookbooks.some((owned) => owned.id === cookbook.id) || cookbook.accessLevel === 'cookbook'
+  );
   if (route.name === 'recipe-detail') {
-    return recipes.getRecipeById(route.params.id)?.cookbookId || '';
+    const cookbookId = recipes.getRecipeById(route.params.id)?.cookbookId || '';
+    if (canAddRecipes(recipes.getCookbookById(cookbookId))) return cookbookId;
   }
 
   if (route.name === 'home') {
     const visibleCookbooks = allCookbooks.value.filter(
       (cookbook) => !recipes.state.excludedCookbookIds.includes(cookbook.id),
     );
-    return visibleCookbooks[0]?.id || '';
+    return visibleCookbooks.find(canAddRecipes)?.id || recipes.state.cookbooks[0]?.id || '';
   }
 
-  return '';
+  return recipes.state.cookbooks[0]?.id || '';
 });
 
 const newRecipeRoute = computed(() => ({

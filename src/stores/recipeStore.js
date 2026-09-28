@@ -115,10 +115,16 @@ const saveCookbook = async (cookbook) => {
   const data = await res.json();
   if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to save cookbook.');
 
-  const exists = state.cookbooks.some((item) => item.id === data.cookbook.id);
-  state.cookbooks = sortByDisplayOrder(exists
-    ? state.cookbooks.map((item) => item.id === data.cookbook.id ? data.cookbook : item)
-    : [...state.cookbooks, data.cookbook]);
+  const ownedIndex = state.cookbooks.findIndex((item) => item.id === data.cookbook.id);
+  const sharedIndex = state.sharedCookbooks.findIndex((item) => item.id === data.cookbook.id);
+  if (sharedIndex >= 0 && ownedIndex < 0) {
+    state.sharedCookbooks = sortByDisplayOrder(state.sharedCookbooks.map((item) =>
+      item.id === data.cookbook.id ? { ...item, ...data.cookbook } : item));
+  } else {
+    state.cookbooks = sortByDisplayOrder(ownedIndex >= 0
+      ? state.cookbooks.map((item) => item.id === data.cookbook.id ? data.cookbook : item)
+      : [...state.cookbooks, data.cookbook]);
+  }
   return data.cookbook;
 };
 

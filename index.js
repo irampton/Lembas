@@ -440,7 +440,7 @@ app.put("/api/cookbooks/:id", auth.requireAuth, (req, res) => {
   const { id } = req.params;
   const { name, description, color } = req.body || {};
   const cookbook = db.getCookbookById(id);
-  if (!cookbook || cookbook.ownerId !== req.user.id) {
+  if (!cookbook || !db.isCookbookManager(id, req.user.id)) {
     res.status(404).json({ success: false, error: "Cookbook not found." });
     return;
   }
@@ -518,7 +518,7 @@ app.post("/api/cookbooks/:id/share/public", auth.requireAuth, (req, res) => {
 
 app.post("/api/cookbooks/:id/share/user", auth.requireAuth, (req, res) => {
   const { id } = req.params;
-  const { userId, canEdit } = req.body || {};
+  const { userId, accessLevel } = req.body || {};
   const cookbook = db.getCookbookById(id);
   if (!cookbook || cookbook.ownerId !== req.user.id) {
     res.status(404).json({ success: false, error: "Cookbook not found." });
@@ -537,7 +537,11 @@ app.post("/api/cookbooks/:id/share/user", auth.requireAuth, (req, res) => {
     res.status(400).json({ success: false, error: "You can only share cookbooks with friends." });
     return;
   }
-  const share = db.upsertCookbookUserShare(id, userId, Boolean(canEdit));
+  if (!["view", "recipes", "cookbook"].includes(accessLevel)) {
+    res.status(400).json({ success: false, error: "Choose a valid sharing permission." });
+    return;
+  }
+  const share = db.upsertCookbookUserShare(id, userId, accessLevel);
   emitLibraryForUser(userId);
   res.json({ success: true, share: { ...share, username: targetUser.username } });
 });
@@ -704,7 +708,11 @@ app.get("/api/cookbook-share/:token", (req, res) => {
     cookbook: { ...cookbook, ownerUsername: owner?.username || "" },
     recipes,
     permissions: {
-      canEdit: share.type === "user" && Boolean(share.canEdit) && req.user && req.user.id === share.userId,
+      accessLevel: req.user && req.user.id === cookbook.ownerId
+        ? "cookbook"
+        : share.type === "user" && req.user && req.user.id === share.userId
+          ? (share.accessLevel || (share.canEdit ? "cookbook" : "view"))
+          : "view",
     },
   });
 });
@@ -883,13 +891,6 @@ io.on("connection", (socket) => {
     const normalized = normalizeRecipe(incoming);
     const existing = normalized.id ? db.getRecipeByIdAnyOwner(normalized.id) : null;
     const previousCookbookId = existing?.cookbookId || null;
-    if (existing && previousCookbookId && normalized.cookbookId && previousCookbookId !== normalized.cookbookId) {
-      const canEditPrevious = db.isCookbookEditor(previousCookbookId, user.id);
-      if (!canEditPrevious) {
-        reply({ success: false, error: "You cannot move this recipe out of its current cookbook." });
-        return;
-      }
-    }
     const incomingCookbookId = normalized.cookbookId || db.getDefaultCookbookForOwner(user.id)?.id;
     let cookbook = incomingCookbookId ? db.getCookbookById(incomingCookbookId) : null;
     if (!cookbook) {
@@ -899,7 +900,18 @@ io.on("connection", (socket) => {
       reply({ success: false, error: "Cookbook not found." });
       return;
     }
-    const canEditCookbook = cookbook.ownerId === user.id || db.isCookbookEditor(cookbook.id, user.id);
+    if (existing && previousCookbookId !== cookbook.id) {
+      const previousCookbook = db.getCookbookById(previousCookbookId);
+      const canMoveRecipe = previousCookbook?.ownerId === user.id
+        && db.isCookbookManager(cookbook.id, user.id);
+      if (!canMoveRecipe) {
+        reply({ success: false, error: "Only the cookbook owner can move this recipe to another cookbook." });
+        return;
+      }
+    }
+    const canEditCookbook = existing
+      ? db.isCookbookEditor(cookbook.id, user.id)
+      : db.isCookbookManager(cookbook.id, user.id);
     if (!canEditCookbook) {
       reply({ success: false, error: "You do not have permission to edit this cookbook." });
       return;
@@ -930,8 +942,8 @@ io.on("connection", (socket) => {
       reply({ success: false, error: "Recipe not found." });
       return;
     }
-    const canEditCookbook = db.isCookbookEditor(recipe.cookbookId, user.id);
-    if (!canEditCookbook) {
+    const canManageCookbook = db.isCookbookManager(recipe.cookbookId, user.id);
+    if (!canManageCookbook) {
       reply({ success: false, error: "You do not have permission to delete this recipe." });
       return;
     }

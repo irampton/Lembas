@@ -209,6 +209,14 @@ const hasCookbookDisplayOrder = cookbookColumns.some((col) => col.name === "disp
 if (!hasCookbookIsDefault) {
   db.exec("ALTER TABLE cookbooks ADD COLUMN isDefault INTEGER DEFAULT 0;");
 }
+
+const cookbookShareColumns = db.prepare("PRAGMA table_info('cookbook_shares')").all();
+const hasCookbookAccessLevel = cookbookShareColumns.some((col) => col.name === "accessLevel");
+if (!hasCookbookAccessLevel) {
+  db.exec("ALTER TABLE cookbook_shares ADD COLUMN accessLevel TEXT NOT NULL DEFAULT 'view';");
+  // The old canEdit permission represented full cookbook collaboration.
+  db.exec("UPDATE cookbook_shares SET accessLevel = CASE WHEN canEdit = 1 THEN 'cookbook' ELSE 'view' END;");
+}
 if (!hasCookbookDisplayOrder) {
   db.exec("ALTER TABLE cookbooks ADD COLUMN displayOrder INTEGER NOT NULL DEFAULT 0;");
   const owners = db.prepare("SELECT DISTINCT ownerId FROM cookbooks").all();
@@ -644,13 +652,14 @@ export const removeCookbookPublicShare = (cookbookId) => {
   stmt.run(cookbookId);
 };
 
-export const upsertCookbookUserShare = (cookbookId, userId, canEdit = false) => {
+export const upsertCookbookUserShare = (cookbookId, userId, accessLevel = "view") => {
+  const normalizedLevel = ["view", "recipes", "cookbook"].includes(accessLevel) ? accessLevel : "view";
   const existing = db
     .prepare("SELECT * FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'")
     .get(cookbookId, userId);
   if (existing) {
-    db.prepare("UPDATE cookbook_shares SET canEdit = ? WHERE id = ?").run(canEdit ? 1 : 0, existing.id);
-    return { ...existing, canEdit: canEdit ? 1 : 0 };
+    db.prepare("UPDATE cookbook_shares SET canEdit = ?, accessLevel = ? WHERE id = ?").run(normalizedLevel === "view" ? 0 : 1, normalizedLevel, existing.id);
+    return { ...existing, canEdit: normalizedLevel === "view" ? 0 : 1, accessLevel: normalizedLevel };
   }
   const payload = {
     id: crypto.randomUUID(),
@@ -658,11 +667,12 @@ export const upsertCookbookUserShare = (cookbookId, userId, canEdit = false) => 
     token: randomToken(),
     type: "user",
     userId,
-    canEdit: canEdit ? 1 : 0,
+    canEdit: normalizedLevel === "view" ? 0 : 1,
+    accessLevel: normalizedLevel,
     createdAt: new Date().toISOString(),
   };
   db.prepare(
-    "INSERT INTO cookbook_shares (id, cookbookId, token, type, userId, canEdit, createdAt) VALUES (@id, @cookbookId, @token, @type, @userId, @canEdit, @createdAt)"
+    "INSERT INTO cookbook_shares (id, cookbookId, token, type, userId, canEdit, accessLevel, createdAt) VALUES (@id, @cookbookId, @token, @type, @userId, @canEdit, @accessLevel, @createdAt)"
   ).run(payload);
   return payload;
 };
@@ -877,7 +887,7 @@ export const listSharedRecipesForUser = (userId) => {
 export const listSharedCookbooksForUser = (userId) => {
   if (!userId) return [];
   const stmt = db.prepare(`
-    SELECT cs.id as shareId, cs.token, cs.canEdit, cs.createdAt as sharedAt, cs.type,
+    SELECT cs.id as shareId, cs.token, cs.canEdit, cs.accessLevel, cs.createdAt as sharedAt, cs.type,
            cb.*, u.username as ownerUsername
     FROM cookbook_shares cs
     JOIN cookbooks cb ON cb.id = cs.cookbookId
@@ -893,6 +903,8 @@ export const listSharedCookbooksForUser = (userId) => {
       shareId: row.shareId,
       shareToken: row.token,
       canEdit: Boolean(row.canEdit),
+      accessLevel: row.accessLevel || (row.canEdit ? "cookbook" : "view"),
+      canManageCookbook: (row.accessLevel || (row.canEdit ? "cookbook" : "view")) === "cookbook",
       sharedAt: row.sharedAt,
       ownerUsername: row.ownerUsername || "",
       shareType: row.type,
@@ -915,9 +927,19 @@ export const isCookbookEditor = (cookbookId, userId) => {
   if (!cookbook) return false;
   if (cookbook.ownerId === userId) return true;
   const share = db
-    .prepare("SELECT canEdit FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'")
+    .prepare("SELECT canEdit, accessLevel FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'")
     .get(cookbookId, userId);
-  return Boolean(share?.canEdit);
+  return ["recipes", "cookbook"].includes(share?.accessLevel || (share?.canEdit ? "cookbook" : "view"));
+};
+
+export const isCookbookManager = (cookbookId, userId) => {
+  const cookbook = getCookbookById(cookbookId);
+  if (!cookbook) return false;
+  if (cookbook.ownerId === userId) return true;
+  const share = db
+    .prepare("SELECT canEdit, accessLevel FROM cookbook_shares WHERE cookbookId = ? AND userId = ? AND type = 'user'")
+    .get(cookbookId, userId);
+  return (share?.accessLevel || (share?.canEdit ? "cookbook" : "view")) === "cookbook";
 };
 
 export const getLibraryForUser = (userId) => {
@@ -928,6 +950,7 @@ export const getLibraryForUser = (userId) => {
   const recipes = getRecipesForCookbookIds(accessibleCookbookIds).map((recipe) => ({
     ...recipe,
     canEdit: recipe.ownerId === userId || isCookbookEditor(recipe.cookbookId, userId),
+    canManageCookbook: isCookbookManager(recipe.cookbookId, userId),
     isSharedCookbook: sharedIds.has(recipe.cookbookId),
   }));
   return { cookbooks, sharedCookbooks, recipes };
