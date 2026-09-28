@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4" @click.self="$emit('close')">
-      <section class="relative max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 pt-14 shadow-2xl" role="dialog" aria-modal="true" :aria-label="ariaLabel" @keydown.esc="$emit('close')">
-        <button v-if="closable" ref="closeButton" type="button" class="absolute left-4 top-4 rounded-full p-1 text-light hover:bg-base-alt hover:text-base-dark" aria-label="Close" @click="$emit('close')">
+    <div class="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4" @click.self="close">
+      <section class="relative max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" :class="{ 'pt-14': closable && !noclose }" role="dialog" aria-modal="true" :aria-label="ariaLabel" @keydown.esc="close">
+        <button v-if="closable && !noclose" ref="closeButton" type="button" class="absolute left-4 top-4 rounded-full p-1 text-light hover:bg-base-alt hover:text-base-dark" aria-label="Close" @click="$emit('close')">
           <XMarkIcon class="size-6" />
         </button>
         <slot />
@@ -27,9 +27,10 @@ import { nextTick, onMounted, ref } from 'vue';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 import BaseButton from './BaseButton.vue';
 
-defineProps({
+const props = defineProps({
   ariaLabel: { type: String, default: 'Popup' },
   closable: { type: Boolean, default: true },
+  noclose: { type: Boolean, default: false },
   buttons: {
     type: Array,
     default: () => [],
@@ -40,8 +41,11 @@ defineProps({
   confirmLabel: { type: String, default: 'Save' },
 });
 
-defineEmits(['close', 'delete', 'confirm']);
+const emit = defineEmits(['close', 'delete', 'confirm']);
 const closeButton = ref(null);
+const close = () => {
+  if (!props.noclose && props.closable) emit('close');
+};
 const buttonType = (button) => ({ cancel: 'cancel', delete: 'delete', confirm: 'submit' })[button];
 const buttonLabel = (button) => button === 'confirm' ? 'Save' : `${button.charAt(0).toUpperCase()}${button.slice(1)}`;
 

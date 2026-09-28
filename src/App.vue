@@ -1,12 +1,14 @@
 <template>
   <NavBar v-if="auth.state.user" @go-home="goHome" />
   <RouterView :key="$route.fullPath" />
+  <WelcomePopup v-if="auth.state.user && auth.state.user.onboardingComplete === false" />
 </template>
 
 <script setup>
 import { onMounted, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import NavBar from './shared/NavBar.vue';
+import WelcomePopup from './shared/WelcomePopup.vue';
 import { useAuthStore } from './stores/authStore';
 import { useRecipeStore } from './stores/recipeStore';
 

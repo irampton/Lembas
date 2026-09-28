@@ -20,6 +20,7 @@ db.exec(`
     displayName TEXT NOT NULL,
     passwordHash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'user')),
+    onboardingComplete INTEGER NOT NULL DEFAULT 0,
     createdAt TEXT NOT NULL
   );
 
@@ -145,8 +146,13 @@ db.exec(`
 
 const userTableColumns = db.prepare("PRAGMA table_info('users')").all();
 const hasDisplayName = userTableColumns.some((col) => col.name === "displayName");
+const hasOnboardingComplete = userTableColumns.some((col) => col.name === "onboardingComplete");
 if (!hasDisplayName) {
   db.exec("ALTER TABLE users ADD COLUMN displayName TEXT;");
+}
+if (!hasOnboardingComplete) {
+  // Existing accounts predate onboarding and should not be interrupted by it.
+  db.exec("ALTER TABLE users ADD COLUMN onboardingComplete INTEGER NOT NULL DEFAULT 1;");
 }
 db.exec("UPDATE users SET displayName = username WHERE displayName IS NULL OR displayName = '';");
 db.exec("UPDATE users SET username = lower(username);");
@@ -470,8 +476,8 @@ export const updateCookbook = (cookbook) => {
   return getCookbookById(cookbook.id);
 };
 
-const userColumns = "id, username, displayName, role, createdAt, passwordHash";
-const userSafeColumns = "id, username, displayName, role, createdAt";
+const userColumns = "id, username, displayName, role, onboardingComplete, createdAt, passwordHash";
+const userSafeColumns = "id, username, displayName, role, onboardingComplete, createdAt";
 
 const normalizeUsernameInput = (username) => (username || "").trim().toLowerCase();
 
@@ -506,6 +512,20 @@ export const updateUserProfile = (id, { username, displayName }) => {
   ).run({ id, username, displayName });
   return info.changes ? findUserById(id) : null;
 };
+
+export const completeUserOnboarding = db.transaction((userId, { displayName, cookbookName, color }) => {
+  const user = findUserById(userId);
+  if (!user) return null;
+
+  db.prepare("UPDATE users SET displayName = ?, onboardingComplete = 1 WHERE id = ?")
+    .run(displayName, userId);
+
+  const cookbook = ensureDefaultCookbookForUser(user);
+  db.prepare("UPDATE cookbooks SET name = ?, color = ? WHERE id = ? AND ownerId = ?")
+    .run(cookbookName, color, cookbook.id, userId);
+
+  return { user: findUserById(userId), cookbook: getCookbookById(cookbook.id) };
+});
 
 export const ensureDefaultCookbookForUser = (user) => {
   if (!user?.id) return null;

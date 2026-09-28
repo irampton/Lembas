@@ -11,6 +11,7 @@ export const sanitizeUser = (user) =>
         id: user.id,
         username: user.username,
         displayName: user.displayName || user.username,
+        onboardingComplete: Boolean(user.onboardingComplete),
         role: user.role,
         createdAt: user.createdAt,
       }

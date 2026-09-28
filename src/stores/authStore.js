@@ -113,6 +113,25 @@ const updateProfile = async ({ username, displayName }) => {
   }
 };
 
+const completeOnboarding = async ({ displayName, cookbookName, color }) => {
+  state.loading = true;
+  state.error = null;
+  try {
+    const res = await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ displayName, cookbookName, color }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to finish setup.');
+    setUser(data.user);
+    return data;
+  } finally {
+    state.loading = false;
+  }
+};
+
 const logout = async () => {
   try {
     await fetch('/api/logout', { method: 'POST', credentials: 'include' });
@@ -129,6 +148,7 @@ export const useAuthStore = () => ({
   login,
   signup,
   updateProfile,
+  completeOnboarding,
   logout,
   canManageUsers: () => ['owner', 'admin'].includes(state.user?.role),
   isOwner: () => state.user?.role === 'owner',

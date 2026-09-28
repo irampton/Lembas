@@ -240,6 +240,33 @@ app.post("/api/logout", auth.logoutHandler);
 app.get("/api/me", auth.meHandler);
 app.put("/api/profile", auth.requireAuth, auth.updateProfileHandler);
 
+app.post("/api/onboarding", auth.requireAuth, (req, res) => {
+  const displayName = (req.body?.displayName || "").trim();
+  const cookbookName = (req.body?.cookbookName || "").trim();
+  const color = (req.body?.color || "").trim();
+
+  if (!displayName || Array.from(displayName).length > 24) {
+    res.status(400).json({ success: false, error: "Display name must be between 1 and 24 characters." });
+    return;
+  }
+  if (!cookbookName || cookbookName.length > 80) {
+    res.status(400).json({ success: false, error: "Cookbook name must be between 1 and 80 characters." });
+    return;
+  }
+  if (!/^#[0-9a-f]{6}$/i.test(color)) {
+    res.status(400).json({ success: false, error: "Choose a valid cookbook color." });
+    return;
+  }
+
+  const result = db.completeUserOnboarding(req.user.id, { displayName, cookbookName, color });
+  if (!result) {
+    res.status(404).json({ success: false, error: "User not found." });
+    return;
+  }
+  emitLibraryForUser(req.user.id);
+  res.json({ success: true, user: auth.sanitizeUser(result.user), cookbook: result.cookbook });
+});
+
 app.get("/api/users/search", auth.requireAuth, (req, res) => {
   const q = (req.query.q || "").toString().trim().toLowerCase();
   const friendsOnly = req.query.scope === "friends" || req.query.friendsOnly === "true";
