@@ -6,21 +6,13 @@
           {{ isEditing ? "Edit recipe" : "New recipe" }}
         </h1>
         <div class="flex items-center gap-1">
-          <BaseDropdown
+          <CookbookDropdown
             v-if="showCookbookSelect"
             v-model="selectedCookbookId"
+            :cookbooks="cookbookOptions"
             :disabled="cookbookReadonly"
-            color-style="accent"
             aria-label="Cookbook"
-          >
-            <option
-              v-for="cookbook in cookbookOptions"
-              :key="cookbook.id"
-              :value="cookbook.id"
-            >
-              {{ cookbook.name }}
-            </option>
-          </BaseDropdown>
+          />
           <div class="rounded-xl p-1 pt-2 hover:bg-base-alt">
           <button
             type="submit"
@@ -257,6 +249,7 @@ import BaseButton from "../../baseComponents/BaseButton.vue";
 import BaseNumberInput from "../../baseComponents/BaseNumberInput.vue";
 import BaseTextInput from "../../baseComponents/BaseTextInput.vue";
 import BaseDropdown from "../../baseComponents/BaseDropdown.vue";
+import CookbookDropdown from "../../baseComponents/CookbookDropdown.vue";
 import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
 import BaseAutocomplete from "../../baseComponents/BaseAutocomplete.vue";
 import BaseTag from "../../baseComponents/BaseTag.vue";
@@ -289,6 +282,7 @@ export default {
     BaseNumberInput,
     BaseTextInput,
     BaseDropdown,
+    CookbookDropdown,
     BaseTextArea,
     BaseAutocomplete,
     BaseTag,

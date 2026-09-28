@@ -10,9 +10,7 @@
           <input v-model="mode" type="radio" value="move" class="mt-1">
           <span class="grow">
             <span class="block">Move them to another cookbook</span>
-            <BaseDropdown v-model="targetCookbookId" class="mt-2" aria-label="Destination cookbook" :disabled="mode !== 'move'">
-              <option v-for="option in destinationCookbooks" :key="option.id" :value="option.id">{{ option.name }}</option>
-            </BaseDropdown>
+            <CookbookDropdown v-model="targetCookbookId" :cookbooks="destinationCookbooks" class="mt-2" aria-label="Destination cookbook" :disabled="mode !== 'move'" />
           </span>
         </label>
         <label class="flex items-center gap-2 text-error">
@@ -26,7 +24,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import BaseDropdown from '../baseComponents/BaseDropdown.vue';
+import CookbookDropdown from '../baseComponents/CookbookDropdown.vue';
 import BasePopup from '../baseComponents/BasePopup.vue';
 
 const props = defineProps({
