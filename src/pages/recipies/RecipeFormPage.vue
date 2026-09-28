@@ -230,14 +230,41 @@
           Cancel
         </BaseButton>
         <BaseButton
+          v-if="canDelete"
+          class="mr-2"
+          colorType="delete"
+          :disabled="isDeleting"
+          @click="openDeleteConfirmation"
+        >
+          Delete
+        </BaseButton>
+        <BaseButton
           colorType="submit"
           native-type="submit"
-          :disabled="isSaving || (isShareEdit && !sharedRecipe)"
+          :disabled="isSaving || isDeleting || (isShareEdit && !sharedRecipe)"
         >
           {{ isSaving ? "Saving…" : "Save" }}
         </BaseButton>
       </div>
     </form>
+
+    <BasePopup
+      v-if="showDeleteConfirmation"
+      aria-label="Delete recipe"
+      :buttons="['cancel', 'delete']"
+      :delete-disabled="isDeleting"
+      @close="closeDeleteConfirmation"
+      @delete="deleteRecipe"
+    >
+      <div class="text-center">
+        <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-red-100 text-error">
+          <TrashIcon class="size-6" />
+        </div>
+        <h2 class="text-xl font-bold">Delete {{ currentRecipe?.title || "this recipe" }}?</h2>
+        <p class="mt-2 text-light">This permanently deletes the recipe and cannot be undone.</p>
+        <p v-if="deleteError" class="mt-3 text-error" role="alert">{{ deleteError }}</p>
+      </div>
+    </BasePopup>
   </section>
 </template>
 
@@ -248,6 +275,7 @@ import {
   CheckIcon,
   CheckCircleIcon,
   PlusIcon,
+  TrashIcon,
   XMarkIcon,
 } from "@heroicons/vue/24/outline";
 import { RouterLink } from "vue-router";
@@ -263,6 +291,7 @@ import CookbookDropdown from "../../baseComponents/CookbookDropdown.vue";
 import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
 import BaseAutocomplete from "../../baseComponents/BaseAutocomplete.vue";
 import BaseTag from "../../baseComponents/BaseTag.vue";
+import BasePopup from "../../baseComponents/BasePopup.vue";
 import UnitAutocomplete from "../../baseComponents/UnitAutocomplete.vue";
 import { formatQuantity } from "../../utils/formatQuantity.js";
 
@@ -288,6 +317,7 @@ export default {
     CheckIcon,
     CheckCircleIcon,
     PlusIcon,
+    TrashIcon,
     XMarkIcon,
     BaseButton,
     BaseNumberInput,
@@ -297,6 +327,7 @@ export default {
     BaseTextArea,
     BaseAutocomplete,
     BaseTag,
+    BasePopup,
     UnitAutocomplete,
   },
   data() {
@@ -321,6 +352,9 @@ export default {
       tagInput: "",
       isTagInputVisible: false,
       isSaving: false,
+      isDeleting: false,
+      showDeleteConfirmation: false,
+      deleteError: null,
       sharedRecipe: null,
       shareError: null,
       selectedCookbookId: "",
@@ -340,6 +374,13 @@ export default {
     },
     isEditing() {
       return Boolean(this.$route.params.id) || this.isShareEdit;
+    },
+    canDelete() {
+      return Boolean(
+        this.$route.params.id &&
+        this.currentRecipe?.canManageCookbook &&
+        !this.isShareEdit,
+      );
     },
     isShareOwner() {
       return (
@@ -562,6 +603,29 @@ export default {
     },
     removeTag(index) {
       this.form.tags.splice(index, 1);
+    },
+    openDeleteConfirmation() {
+      this.deleteError = null;
+      this.showDeleteConfirmation = true;
+    },
+    closeDeleteConfirmation() {
+      if (this.isDeleting) return;
+      this.showDeleteConfirmation = false;
+      this.deleteError = null;
+    },
+    async deleteRecipe() {
+      if (!this.canDelete || this.isDeleting) return;
+      this.isDeleting = true;
+      this.deleteError = null;
+      try {
+        await this.store.deleteRecipe(this.currentRecipe.id);
+        this.showDeleteConfirmation = false;
+        this.$router.push({ name: "home" });
+      } catch (error) {
+        this.deleteError = error.message || "Unable to delete recipe.";
+      } finally {
+        this.isDeleting = false;
+      }
     },
     buildPayload() {
       const ingredients = this.form.ingredients

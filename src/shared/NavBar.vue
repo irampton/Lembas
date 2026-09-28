@@ -25,15 +25,52 @@
       >
     </div>
     <div class="relative flex items-center gap-3 text-right">
-      <RouterLink :to="newRecipeRoute" class="text-white" aria-label="Add new recipe">
+      <button
+        type="button"
+        class="text-white"
+        aria-label="Add"
+        :aria-expanded="addMenuOpen"
+        @click.stop="toggleAddMenu"
+      >
         <PlusIcon class="size-6" />
-      </RouterLink>
+      </button>
+      <BaseFloatingBox
+        v-if="addMenuOpen"
+        class="absolute right-8 top-full z-10 mt-3 min-w-48 text-left"
+        @clickaway="addMenuOpen = false"
+      >
+        <RouterLink
+          :to="newRecipeRoute"
+          class="flex items-center gap-2 font-semibold text-accent hover:text-accent-alt"
+          @click="addMenuOpen = false"
+        >
+          <PlusIcon class="size-5 shrink-0" aria-hidden="true" />
+          New Recipe
+        </RouterLink>
+        <RouterLink
+          v-if="llmAvailable"
+          :to="importRecipeRoute"
+          class="mt-2 flex items-center gap-2 font-semibold text-accent hover:text-accent-alt"
+          @click="addMenuOpen = false"
+        >
+          <ArrowRightEndOnRectangleIcon class="size-5 shrink-0" aria-hidden="true" />
+          Import Recipe
+        </RouterLink>
+        <button
+          type="button"
+          class="mt-2 flex w-full items-center gap-2 border-t border-primary-alt pt-2 text-left font-semibold text-accent hover:text-accent-alt"
+          @click="openNewCookbook"
+        >
+          <PlusIcon class="size-5 shrink-0" aria-hidden="true" />
+          Cookbook
+        </button>
+      </BaseFloatingBox>
       <button
         type="button"
         class="text-white"
         aria-label="Open profile menu"
         :aria-expanded="profileMenuOpen"
-        @click.stop="profileMenuOpen = !profileMenuOpen"
+        @click.stop="toggleProfileMenu"
       >
         <UserIcon class="size-6" />
       </button>
@@ -125,8 +162,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
+  ArrowRightEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,
   Bars3Icon,
   Cog6ToothIcon,
@@ -144,11 +182,14 @@ import BaseSidebar from '../baseComponents/BaseSidebar.vue';
 import CookbookPopup from './CookbookPopup.vue';
 import { useAuthStore } from '../stores/authStore';
 import { useRecipeStore } from '../stores/recipeStore';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const auth = useAuthStore();
 const recipes = useRecipeStore();
+const settings = useSettingsStore();
 const router = useRouter();
 const route = useRoute();
+const addMenuOpen = ref(false);
 const profileMenuOpen = ref(false);
 const sidebarOpen = ref(false);
 const editCookbook = ref(null);
@@ -242,6 +283,28 @@ const newRecipeRoute = computed(() => ({
   ...(defaultCookbookId.value ? { query: { cookbookId: defaultCookbookId.value } } : {}),
 }));
 
+const importRecipeRoute = computed(() => ({
+  name: 'recipe-import',
+  ...(defaultCookbookId.value ? { query: { cookbookId: defaultCookbookId.value } } : {}),
+}));
+
+const llmAvailable = computed(() => settings.isLlmEnabled());
+
+const toggleAddMenu = () => {
+  addMenuOpen.value = !addMenuOpen.value;
+  profileMenuOpen.value = false;
+};
+
+const toggleProfileMenu = () => {
+  profileMenuOpen.value = !profileMenuOpen.value;
+  addMenuOpen.value = false;
+};
+
+const openNewCookbook = () => {
+  addMenuOpen.value = false;
+  editCookbook.value = {};
+};
+
 const showSearchResults = () => {
   if (route.name !== 'home') router.push({ name: 'home' });
 };
@@ -264,6 +327,10 @@ const logOut = async () => {
   await auth.logout();
   router.push({ name: 'login' });
 };
+
+onMounted(() => {
+  settings.loadSettings().catch((error) => console.error(error));
+});
 
 defineEmits(['go-home']);
 </script>
