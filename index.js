@@ -238,6 +238,7 @@ app.post("/api/signup", auth.signupHandler);
 app.post("/api/login", auth.loginHandler);
 app.post("/api/logout", auth.logoutHandler);
 app.get("/api/me", auth.meHandler);
+app.put("/api/profile", auth.requireAuth, auth.updateProfileHandler);
 
 app.get("/api/users/search", auth.requireAuth, (req, res) => {
   const q = (req.query.q || "").toString().trim().toLowerCase();
@@ -247,13 +248,15 @@ app.get("/api/users/search", auth.requireAuth, (req, res) => {
     return;
   }
   const userList = friendsOnly
-    ? db.listFriendsForUser(req.user.id).map((friend) => ({ id: friend.userId, username: friend.username }))
+    ? db.listFriendsForUser(req.user.id).map((friend) => ({ id: friend.userId, username: friend.username, displayName: friend.displayName }))
     : db
         .getUsers()
         .filter((u) => u.id !== req.user.id)
-        .map((u) => ({ id: u.id, username: u.username }));
+        .map((u) => ({ id: u.id, username: u.username, displayName: u.displayName }));
 
-  const matches = userList.filter((u) => u.username.toLowerCase().includes(q)).slice(0, 10);
+  const matches = userList.filter((u) =>
+    u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)
+  ).slice(0, 10);
   res.json({ success: true, users: matches });
 });
 
@@ -277,11 +280,14 @@ app.get("/api/friends/search", auth.requireAuth, (req, res) => {
 
   const users = db
     .getUsers()
-    .filter((u) => u.id !== req.user.id && u.username.toLowerCase().includes(q))
+    .filter((u) => u.id !== req.user.id && !friendIds.has(u.id) && (
+      u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)
+    ))
     .slice(0, 10)
     .map((u) => ({
       id: u.id,
       username: u.username,
+      displayName: u.displayName,
       isFriend: friendIds.has(u.id),
       incomingRequest: incomingIds.has(u.id),
       outgoingRequest: outgoingIds.has(u.id),

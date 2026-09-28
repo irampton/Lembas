@@ -10,6 +10,7 @@ export const sanitizeUser = (user) =>
     ? {
         id: user.id,
         username: user.username,
+        displayName: user.displayName || user.username,
         role: user.role,
         createdAt: user.createdAt,
       }
@@ -88,11 +89,11 @@ const createSessionForUser = (userId, res) => {
 
 export const signupHandler = async (req, res) => {
   const { username, password, joinCode } = req.body || {};
-  const trimmedUsername = (username || "").trim();
+  const trimmedUsername = (username || "").trim().toLowerCase();
   const normalizedCode = db.normalizeJoinCode(joinCode);
 
-  if (!trimmedUsername || !password || password.length < 8) {
-    res.status(400).json({ success: false, error: "Username and a password of at least 8 characters are required." });
+  if (!/^[\x21-\x7E]{1,24}$/.test(trimmedUsername) || !password || password.length < 8) {
+    res.status(400).json({ success: false, error: "Username must be 1–24 ASCII characters with no spaces, and the password must be at least 8 characters." });
     return;
   }
 
@@ -119,6 +120,7 @@ export const signupHandler = async (req, res) => {
   const user = db.createUser({
     id,
     username: trimmedUsername,
+    displayName: trimmedUsername,
     passwordHash,
     role: codeRecord.role,
     createdAt: now,
@@ -132,6 +134,42 @@ export const signupHandler = async (req, res) => {
 
   createSessionForUser(user.id, res);
   res.json({ success: true, user: sanitizeUser(user) });
+};
+
+export const updateProfileHandler = (req, res) => {
+  const username = (req.body?.username || "").trim().toLowerCase();
+  const displayName = (req.body?.displayName || "").trim();
+
+  if (!/^[\x21-\x7E]{1,24}$/.test(username)) {
+    res.status(400).json({ success: false, error: "Username must be 1–24 ASCII characters with no spaces." });
+    return;
+  }
+  if (!displayName || Array.from(displayName).length > 24) {
+    res.status(400).json({ success: false, error: "Display name must be between 1 and 24 characters." });
+    return;
+  }
+
+  const existing = db.findUserByUsername(username);
+  if (existing && existing.id !== req.user.id) {
+    res.status(409).json({ success: false, error: "Username already taken." });
+    return;
+  }
+
+  try {
+    const user = db.updateUserProfile(req.user.id, { username, displayName });
+    if (!user) {
+      res.status(404).json({ success: false, error: "User not found." });
+      return;
+    }
+    res.json({ success: true, user: sanitizeUser(user) });
+  } catch (error) {
+    if (error?.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      res.status(409).json({ success: false, error: "Username already taken." });
+      return;
+    }
+    console.error("[profile] Unable to update profile:", error);
+    res.status(500).json({ success: false, error: "Unable to update profile." });
+  }
 };
 
 export const loginHandler = async (req, res) => {

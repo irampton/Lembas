@@ -42,17 +42,34 @@
         class="absolute right-0 top-full z-10 mt-3 min-w-44 text-left"
         @clickaway="profileMenuOpen = false"
       >
-        <p class="border-b border-primary-alt pb-2 font-semibold text-gray-800">{{ auth.state.user?.username }}</p>
-        <RouterLink :to="{ name: 'settings-friends' }" class="mt-2 block text-primary hover:text-primary-alt">
+        <RouterLink
+          :to="{ name: 'settings-profile' }"
+          class="flex items-center gap-2 border-b border-primary-alt pb-2 font-semibold text-gray-800 hover:text-accent"
+          @click="profileMenuOpen = false"
+        >
+          <UserCircleIcon class="size-5 shrink-0" aria-hidden="true" />
+          {{ auth.state.user?.displayName || auth.state.user?.username }}
+        </RouterLink>
+        <RouterLink :to="{ name: 'settings-friends' }" class="mt-2 flex items-center gap-2 text-accent hover:text-accent-alt">
+          <UserGroupIcon class="size-5 shrink-0" aria-hidden="true" />
           Friends
         </RouterLink>
         <RouterLink
           v-if="auth.canManageUsers()"
           :to="{ name: 'admin-server-settings' }"
-          class="mt-2 block text-primary hover:text-primary-alt"
+          class="mt-2 flex items-center gap-2 text-accent hover:text-accent-alt"
         >
+          <ServerStackIcon class="size-5 shrink-0" aria-hidden="true" />
           Admin
         </RouterLink>
+        <button
+          type="button"
+          class="mt-2 flex w-full items-center gap-2 border-t border-primary-alt pt-2 text-left text-accent hover:text-accent-alt"
+          @click="logOut"
+        >
+          <ArrowRightStartOnRectangleIcon class="size-5 shrink-0" aria-hidden="true" />
+          Log out
+        </button>
       </BaseFloatingBox>
     </div>
     <Transition name="sidebar">
@@ -99,7 +116,17 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { Bars3Icon, Cog6ToothIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@heroicons/vue/24/outline';
+import {
+  ArrowRightStartOnRectangleIcon,
+  Bars3Icon,
+  Cog6ToothIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  ServerStackIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+  UserIcon,
+} from '@heroicons/vue/24/outline';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BaseButton from '../baseComponents/BaseButton.vue';
 import BaseFloatingBox from '../baseComponents/BaseFloatingBox.vue';
@@ -216,6 +243,12 @@ const openCookbook = (cookbookId) => {
     .map((cookbook) => cookbook.id);
   sidebarOpen.value = false;
   router.push({ name: 'home' });
+};
+
+const logOut = async () => {
+  profileMenuOpen.value = false;
+  await auth.logout();
+  router.push({ name: 'login' });
 };
 
 defineEmits(['go-home']);

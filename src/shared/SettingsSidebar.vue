@@ -1,15 +1,19 @@
 <template>
   <aside class="w-full shrink-0 lg:w-60" aria-label="Settings navigation">
     <div class="rounded-2xl bg-base-alt p-3 drop-shadow-lg lg:sticky lg:top-[86px]">
-      <div class="flex items-center gap-3 px-3 pb-3 pt-2">
+      <RouterLink
+        :to="{ name: 'settings-profile' }"
+        class="group flex items-center gap-3 rounded-xl px-3 pb-3 pt-2"
+        aria-label="Open profile"
+      >
         <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
           <UserCircleIcon class="size-6" aria-hidden="true" />
         </div>
         <div class="min-w-0">
-          <p class="truncate font-bold text-base-dark">{{ auth.state.user?.username }}</p>
+          <p class="truncate font-bold text-base-dark group-hover:text-accent">{{ auth.state.user?.displayName || auth.state.user?.username }}</p>
           <p class="text-xs capitalize text-light">{{ auth.state.user?.role || 'user' }}</p>
         </div>
-      </div>
+      </RouterLink>
 
       <nav class="flex gap-2 overflow-x-auto border-t border-accent-alt/15 pt-3 lg:block lg:space-y-1" aria-label="Settings pages">
         <RouterLink

@@ -9,6 +9,7 @@ import SignupPage from './pages/login/SignupPage.vue';
 import AdminUsersPage from './pages/settings/AdminUsersPage.vue';
 import AdminServerSettingsPage from './pages/settings/AdminServerSettingsPage.vue';
 import FriendsPage from './pages/settings/FriendsPage.vue';
+import ProfilePage from './pages/settings/ProfilePage.vue';
 import { useAuthStore } from './stores/authStore';
 
 const router = createRouter({
@@ -30,6 +31,12 @@ const router = createRouter({
     },
     { path: '/login', name: 'login', component: LoginPage },
     { path: '/signup', name: 'signup', component: SignupPage },
+    {
+      path: '/settings/profile',
+      name: 'settings-profile',
+      component: ProfilePage,
+      meta: { requiresAuth: true, settingsPage: true },
+    },
     {
       path: '/settings/friends',
       name: 'settings-friends',

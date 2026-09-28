@@ -22,9 +22,9 @@
             <h2 class="text-xl font-bold">Add Friend</h2>
             <MagnifyingGlassIcon class="size-6 text-accent" />
           </div>
-          <label for="friend-search" class="sr-only">Search by username</label>
+          <label for="friend-search" class="sr-only">Search by name</label>
           <BaseTextInput id="friend-search" v-model="searchQuery" type="search" inputmode="search"
-            placeholder="Search by username" />
+            placeholder="Search by name" />
           <p v-if="searchError" role="alert" class="mt-3 text-sm text-red-700">{{ searchError }}</p>
           <p v-if="searchLoading" role="status" class="mt-4 text-sm text-light">Searching…</p>
           <p v-else-if="!searchResults.length && searchQuery.trim()"
@@ -33,16 +33,8 @@
             <li v-for="user in searchResults" :key="user.id"
               class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div class="min-w-0">
-                <p class="truncate font-bold">{{ user.username }}</p>
-                <p class="text-sm text-light">
-                  {{ user.isFriend
-                    ? 'Already friends'
-                    : user.incomingRequest
-                      ? 'Sent you a request'
-                      : user.outgoingRequest
-                        ? 'Request sent'
-                        : 'Not connected yet' }}
-                </p>
+                <p class="truncate text-lg font-bold">{{ user.displayName || user.username }}</p>
+                <p class="truncate text-xs font-semibold lowercase tracking-wider text-light">{{ user.username }}</p>
               </div>
               <span v-if="user.isFriend"
                 class="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">Friends</span>
@@ -82,7 +74,8 @@
                   class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 font-bold text-primary">
                   {{ friend.username.charAt(0).toUpperCase() }}</div>
                 <div class="min-w-0">
-                  <p class="truncate font-bold">{{ friend.username }}</p>
+                  <p class="truncate font-bold">{{ friend.displayName || friend.username }}</p>
+                  <p class="truncate text-xs font-semibold lowercase tracking-wider text-light">{{ friend.username }}</p>
                 </div>
               </div>
               <button type="button"
@@ -96,7 +89,8 @@
                   class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-bold text-accent">
                   {{ request.username.charAt(0).toUpperCase() }}</div>
                 <div class="min-w-0">
-                  <p class="truncate font-bold">{{ request.username }}</p>
+                  <p class="truncate font-bold">{{ request.displayName || request.username }}</p>
+                  <p class="truncate text-xs font-semibold lowercase tracking-wider text-light">{{ request.username }}</p>
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-2">
@@ -150,7 +144,7 @@ const mergedResults = computed(() =>
   })
 );
 
-const searchResults = computed(() => mergedResults.value);
+const searchResults = computed(() => mergedResults.value.filter((user) => !user.isFriend));
 
 const refresh = async () => {
   pageError.value = null;

@@ -9,9 +9,12 @@
             id="username"
             v-model="form.username"
             autocomplete="username"
-            class="px-4 py-3"
+            maxlength="24"
+            class="lowercase px-4 py-3"
             required
+            @update:model-value="form.username = $event.toLowerCase()"
           />
+          <p class="mt-1 text-xs text-light">Up to 24 ASCII characters with no spaces.</p>
         </div>
         <div>
           <label for="password" class="mb-1 block font-bold text-base-dark">Password</label>

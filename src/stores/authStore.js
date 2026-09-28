@@ -91,6 +91,28 @@ const signup = async ({ username, password, joinCode }) => {
   }
 };
 
+const updateProfile = async ({ username, displayName }) => {
+  state.loading = true;
+  state.error = null;
+  try {
+    const res = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, displayName }),
+    });
+    const contentType = res.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await res.json()
+      : { success: false, error: (await res.text()).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() };
+    if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to update profile.');
+    setUser(data.user);
+    return data.user;
+  } finally {
+    state.loading = false;
+  }
+};
+
 const logout = async () => {
   try {
     await fetch('/api/logout', { method: 'POST', credentials: 'include' });
@@ -106,6 +128,7 @@ export const useAuthStore = () => ({
   fetchMe,
   login,
   signup,
+  updateProfile,
   logout,
   canManageUsers: () => ['owner', 'admin'].includes(state.user?.role),
   isOwner: () => state.user?.role === 'owner',

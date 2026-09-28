@@ -17,6 +17,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
+    displayName TEXT NOT NULL,
     passwordHash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'user')),
     createdAt TEXT NOT NULL
@@ -141,6 +142,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_friends_usera ON friends(userA);
   CREATE INDEX IF NOT EXISTS idx_friends_userb ON friends(userB);
 `);
+
+const userTableColumns = db.prepare("PRAGMA table_info('users')").all();
+const hasDisplayName = userTableColumns.some((col) => col.name === "displayName");
+if (!hasDisplayName) {
+  db.exec("ALTER TABLE users ADD COLUMN displayName TEXT;");
+}
+db.exec("UPDATE users SET displayName = username WHERE displayName IS NULL OR displayName = '';");
+db.exec("UPDATE users SET username = lower(username);");
 
 const joinCodeColumns = db.prepare("PRAGMA table_info('join_codes')").all();
 const hasMaxUses = joinCodeColumns.some((col) => col.name === "maxUses");
@@ -453,8 +462,8 @@ export const updateCookbook = (cookbook) => {
   return getCookbookById(cookbook.id);
 };
 
-const userColumns = "id, username, role, createdAt, passwordHash";
-const userSafeColumns = "id, username, role, createdAt";
+const userColumns = "id, username, displayName, role, createdAt, passwordHash";
+const userSafeColumns = "id, username, displayName, role, createdAt";
 
 const normalizeUsernameInput = (username) => (username || "").trim().toLowerCase();
 
@@ -475,12 +484,19 @@ export const getUsers = () => {
   return stmt.all();
 };
 
-export const createUser = ({ id, username, passwordHash, role, createdAt }) => {
+export const createUser = ({ id, username, displayName, passwordHash, role, createdAt }) => {
   const stmt = db.prepare(
-    "INSERT INTO users (id, username, passwordHash, role, createdAt) VALUES (@id, @username, @passwordHash, @role, @createdAt)"
+    "INSERT INTO users (id, username, displayName, passwordHash, role, createdAt) VALUES (@id, @username, @displayName, @passwordHash, @role, @createdAt)"
   );
-  stmt.run({ id, username, passwordHash, role, createdAt });
+  stmt.run({ id, username, displayName: displayName || username, passwordHash, role, createdAt });
   return findUserById(id);
+};
+
+export const updateUserProfile = (id, { username, displayName }) => {
+  const info = db.prepare(
+    "UPDATE users SET username = @username, displayName = @displayName WHERE id = @id"
+  ).run({ id, username, displayName });
+  return info.changes ? findUserById(id) : null;
 };
 
 export const ensureDefaultCookbookForUser = (user) => {
@@ -705,7 +721,7 @@ export const listFriendsForUser = (userId) => {
   const stmt = db.prepare(`
     SELECT f.id, f.userA, f.userB, f.createdAt,
            CASE WHEN f.userA = @userId THEN f.userB ELSE f.userA END as friendId,
-           u.username as friendUsername
+           u.username as friendUsername, u.displayName as friendDisplayName
     FROM friends f
     JOIN users u ON u.id = CASE WHEN f.userA = @userId THEN f.userB ELSE f.userA END
     WHERE f.userA = @userId OR f.userB = @userId
@@ -715,6 +731,7 @@ export const listFriendsForUser = (userId) => {
     id: row.id,
     userId: row.friendId,
     username: row.friendUsername,
+    displayName: row.friendDisplayName,
     createdAt: row.createdAt,
   }));
 };
@@ -766,14 +783,14 @@ export const setFriendRequestStatus = (id, status) => {
 export const listFriendRequests = (userId) => {
   if (!userId) return { incoming: [], outgoing: [] };
   const incomingStmt = db.prepare(`
-    SELECT fr.*, u.username as fromUsername
+    SELECT fr.*, u.username as fromUsername, u.displayName as fromDisplayName
     FROM friend_requests fr
     JOIN users u ON u.id = fr.fromUserId
     WHERE fr.toUserId = ? AND fr.status = 'pending'
     ORDER BY fr.createdAt DESC
   `);
   const outgoingStmt = db.prepare(`
-    SELECT fr.*, u.username as toUsername
+    SELECT fr.*, u.username as toUsername, u.displayName as toDisplayName
     FROM friend_requests fr
     JOIN users u ON u.id = fr.toUserId
     WHERE fr.fromUserId = ? AND fr.status = 'pending'
@@ -787,6 +804,7 @@ export const listFriendRequests = (userId) => {
       status: row.status,
       createdAt: row.createdAt,
       username: row.fromUsername,
+      displayName: row.fromDisplayName,
     })),
     outgoing: outgoingStmt.all(userId).map((row) => ({
       id: row.id,
@@ -795,6 +813,7 @@ export const listFriendRequests = (userId) => {
       status: row.status,
       createdAt: row.createdAt,
       username: row.toUsername,
+      displayName: row.toDisplayName,
     })),
   };
 };
