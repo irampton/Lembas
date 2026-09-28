@@ -1,10 +1,19 @@
 import crypto from "node:crypto";
 import { UNIT_VALUES, normalizeUnit } from "./src/mixins/units.js";
 const DEFAULT_MODEL = "GPT-OSS-20B";
+const PROMPT_CACHE_KEY = "lembas-recipe-import-v2";
 
 const usesResponsesApi = (endpoint) => {
   try {
     return /\/responses\/?$/i.test(new URL(endpoint).pathname);
+  } catch {
+    return false;
+  }
+};
+
+const usesOpenAiApi = (endpoint) => {
+  try {
+    return new URL(endpoint).hostname.toLowerCase() === "api.openai.com";
   } catch {
     return false;
   }
@@ -49,8 +58,9 @@ const requestLlm = async (endpoint, body, { timeoutMs, apiKey } = {}) => {
   return response.json();
 };
 
-const SYSTEM_PROMPT = `You are a careful recipe extraction assistant.
-From the user's provided text and/or image, return ONLY valid JSON with this shape:
+const SYSTEM_PROMPT = `You extract one complete recipe from text, images, or both.
+
+Return exactly one valid JSON object with this shape and no markdown or commentary:
 {
   "title": string,
   "description": string,
@@ -59,22 +69,36 @@ From the user's provided text and/or image, return ONLY valid JSON with this sha
   "ingredients": [{ "name": string, "quantity": string, "unit": string }],
   "steps": string[],
   "notes": string,
+  "servingsVerb": "Makes" | "Serves",
   "servingsQuantity": string,
   "servingsUnit": string
 }
-Rules:
-- Include ALL ingredients you can find; do not omit items. If many exist, include them all.
-- Include ALL preparation steps in the original order; short, direct instructions.
-- Fill "quantity" and "unit" when possible; if unknown, keep them as empty strings.
-- Standardized ingredients (remove brand names, etc.)
-- If there is no title or description provided, choose one
-- Provide 3-4 concise tags focused on meal type and main ingredients (e.g., "dinner", "dessert", "pumpkin", "chicken", "pasta"); omit dietary labels unless given.
-- Units must be chosen ONLY from this list: ${JSON.stringify(UNIT_VALUES)}. Convert close variants (cups, tablespoons, tsp., etc.) to the closest allowed unit. If you cannot map it, leave unit as an empty string.
-- Express customary measurements as simple fractions where applicable (e.g., 1/2, 1/3, 1/4, 3/4).
-- Put any additional cook's guidance, substitutions, or reminders into "notes".
-- If a serving size is present, return the numeric/text value in "servingsQuantity" (e.g., "4", "4-6") and the accompanying text in "servingsUnit" (e.g., "servings", "people", "cups"). If you cannot find one, leave them as empty strings.
-- Use empty strings/arrays when something is missing.
-- Do NOT add extra fields beyond the JSON shape. Respond with JSON only, no prose.`;
+
+Extraction rules:
+- Treat all supplied text and images as one source. Merge complementary information and remove duplicates.
+- Preserve the source's meaning. Never invent ingredients, quantities, times, temperatures, steps, dietary claims, or attribution.
+- If multiple recipes appear, extract the single most complete or clearly primary recipe.
+
+Field rules:
+- title: Use the printed title. If absent, create a short factual title from the dish.
+- description: Use an explicit summary when present. Otherwise write one concise factual sentence based only on the recipe.
+- author: Use the named recipe author, creator, publication, or source. Do not put URLs here. Use an empty string if unknown.
+- tags: Return 3-4 short lowercase tags for meal type, dish type, cuisine when explicit, and main ingredients. Include dietary tags only when explicitly stated or unambiguously supported.
+- ingredients: Include every ingredient exactly once and preserve the source order. Keep preparation details such as "divided", "softened", or "finely chopped" in the name when they affect use. Remove brand names only when doing so does not change the ingredient.
+- ingredient quantity: Return only the amount as a string. Preserve ranges and mixed numbers. Prefer simple fractions such as "1/2" or "1 1/2". Use an empty string when absent.
+- ingredient unit: Use only one value from this exact list: ${JSON.stringify(UNIT_VALUES)}. Normalize obvious variants to that list. If no listed unit fits, leave unit empty and retain essential measurement wording in the ingredient name.
+- steps: Include every preparation and cooking instruction in source order. Each array item must be a complete, direct instruction. Preserve temperatures, durations, visual doneness cues, resting, cooling, and assembly instructions. Do not add step numbers to the text.
+- notes: Collect only source-provided tips, substitutions, storage guidance, make-ahead guidance, optional variations, and other useful information that is not an ingredient or required step. Combine multiple notes into readable plain text.
+- servingsVerb: Use "Serves" when the yield refers to people or servings. Use "Makes" for item counts, batches, volume, or other yields. Default to "Makes" when no yield is provided.
+- servingsQuantity: Return only the quantity or range, such as "4", "4-6", or "12". Use an empty string when absent.
+- servingsUnit: Return only the yield unit, such as "servings", "people", "cookies", or "cups". Use an empty string when absent.
+
+Quality checks before responding:
+- Account for the complete source, including small text and separate regions of an image.
+- Ensure ingredient and step arrays contain strings/objects of the required shape and no null values.
+- Use empty strings or empty arrays for unavailable values.
+- Do not add fields outside the specified JSON object.
+- Output JSON only.`;
 
 const jsonFromText = (text) => {
   if (!text) return {};
@@ -167,6 +191,7 @@ const normalizeRecipe = (payload) => {
       servings?.quantity?.toString?.().trim() ||
       (typeof servings === "string" ? servings.trim() : ""),
     servingsUnit: data.servingsUnit?.toString?.().trim() || servings?.unit?.toString?.().trim() || "",
+    servingsVerb: data.servingsVerb === "Serves" ? "Serves" : "Makes",
   };
 };
 
@@ -179,11 +204,17 @@ export const buildRecipeFromText = async (
     ? `Extract the recipe details from this content. Respond with JSON only.\n\n${text.trim()}`
     : "Extract the recipe details from this image. Respond with JSON only.";
   const responsesApi = usesResponsesApi(endpoint);
+  const cacheSettings = usesOpenAiApi(endpoint)
+    ? { prompt_cache_key: PROMPT_CACHE_KEY }
+    : {};
   const body = responsesApi
     ? {
         model: model || DEFAULT_MODEL,
-        instructions: SYSTEM_PROMPT,
         input: [
+          {
+            role: "developer",
+            content: [{ type: "input_text", text: SYSTEM_PROMPT }],
+          },
           {
             role: "user",
             content: [
@@ -197,6 +228,7 @@ export const buildRecipeFromText = async (
         max_output_tokens: 2000,
         store: false,
         text: { format: { type: "json_object" } },
+        ...cacheSettings,
       }
     : {
         model: model || DEFAULT_MODEL,
@@ -212,9 +244,9 @@ export const buildRecipeFromText = async (
               : input,
           },
         ],
-        temperature: 0.2,
         max_tokens: 2000,
         response_format: { type: "json_object" },
+        ...cacheSettings,
       };
   const data = await requestLlm(endpoint, body, { apiKey });
 
@@ -250,7 +282,6 @@ export const testLlmEndpoint = async (endpoint, { apiKey, model } = {}) => {
       : {
           model: model || DEFAULT_MODEL,
           messages: [{ role: "user", content: "Reply with OK." }],
-          temperature: 0,
           max_tokens: 8,
         },
     { timeoutMs: 15000, apiKey },
