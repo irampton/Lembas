@@ -5,7 +5,7 @@
         <h1 class="font-bold text-3xl text-base-dark md:text-4xl">
           {{ isEditing ? "Edit recipe" : "New recipe" }}
         </h1>
-        <div>
+        <div class="flex items-center gap-1">
           <BaseDropdown
             v-if="showCookbookSelect"
             v-model="selectedCookbookId"
@@ -21,6 +21,17 @@
               {{ cookbook.name }}
             </option>
           </BaseDropdown>
+          <div class="rounded-xl p-1 pt-2 hover:bg-base-alt">
+          <button
+            type="submit"
+            class="text-green-600 disabled:opacity-40"
+            :disabled="isSaving || (isShareEdit && !sharedRecipe)"
+            :aria-label="isSaving ? 'Saving recipe' : 'Save recipe'"
+            :title="isSaving ? 'Saving…' : 'Save recipe'"
+          >
+            <CheckCircleIcon class="size-6 md:size-8" aria-hidden="true" />
+          </button>
+          </div>
         </div>
       </header>
       <p
@@ -172,6 +183,7 @@
           >
             <span
               class="flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-accent font-bold text-accent"
+              :style="stepNumberStyle"
               >{{ index + 1 }}</span
             ><BaseTextArea
               v-model="form.steps[index]"
@@ -232,6 +244,7 @@
 import {
   ArrowDownTrayIcon,
   CheckIcon,
+  CheckCircleIcon,
   PlusIcon,
   XMarkIcon,
 } from "@heroicons/vue/24/outline";
@@ -269,6 +282,7 @@ export default {
     RouterLink,
     ArrowDownTrayIcon,
     CheckIcon,
+    CheckCircleIcon,
     PlusIcon,
     XMarkIcon,
     BaseButton,
@@ -349,6 +363,15 @@ export default {
         (cb) => cb.canEdit,
       );
       return [...owned, ...editableShared];
+    },
+    selectedCookbook() {
+      return this.cookbookOptions.find(
+        (cookbook) => cookbook.id === this.selectedCookbookId,
+      );
+    },
+    stepNumberStyle() {
+      const color = this.selectedCookbook?.color;
+      return color ? { borderColor: color, color } : {};
     },
     availableTagOptions() {
       const selected = new Set(

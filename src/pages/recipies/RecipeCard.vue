@@ -6,7 +6,12 @@
     @click="openRecipe"
     @keydown.enter.prevent="openRecipe"
   >
-    <div class="truncate text-lg font-bold" :title="recipeName">{{ recipeName }}</div>
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0 grow truncate text-lg font-bold" :title="recipeName">{{ recipeName }}</div>
+      <span v-if="cookbook" class="max-w-48 shrink-0 truncate rounded-full px-3 py-1 text-sm font-bold" :style="cookbookStyle" :title="cookbook.name">
+        {{ cookbook.name }}
+      </span>
+    </div>
     <div class="truncate ml-px text-sm text-light" :title="ingredientSummary">{{ ingredientSummary }}</div>
     <div class="truncate text-light mt-1 -ml-2">
       <BaseTag v-for="(tag, index) in normalizedTags" :key="`${tag.name}-${index}`" :color="tag.color" class="ml-1 align-middle">{{ tag.name }}</BaseTag>
@@ -22,6 +27,7 @@ const props = defineProps({
   recipeName: { type: String, default: '' },
   ingredientList: { type: Array, default: () => [] },
   tags: { type: Array, default: () => [] },
+  cookbook: { type: Object, default: null },
 });
 const router = useRouter();
 const openRecipe = () => router.push({ name: 'recipe-detail', params: { id: props.recipeId } });
@@ -35,4 +41,13 @@ const ingredientSummary = computed(() => [...props.ingredientList]
   .sort((a, b) => amount(b.quantity) - amount(a.quantity))
   .map((item) => typeof item === 'string' ? item : item.name).filter(Boolean).join(', '));
 const normalizedTags = computed(() => props.tags.map((tag) => typeof tag === 'string' ? { name: tag } : tag).filter((tag) => tag?.name));
+const cookbookStyle = computed(() => {
+  const color = props.cookbook?.color || '#1D6AA3';
+  const hex = color.replace('#', '');
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  const lightColor = Number.isNaN(red) || (red * 299 + green * 587 + blue * 114) / 1000 > 160;
+  return { backgroundColor: color, color: lightColor ? '#1F2937' : '#FFFFFF' };
+});
 </script>

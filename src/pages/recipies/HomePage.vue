@@ -43,7 +43,7 @@
         v-for="tag in tags"
         :key="tag"
         type="button"
-        class="max-w-full rounded-full bg-accent px-3 py-1 text-sm font-bold text-white drop-shadow-md transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        class="max-w-full rounded-full bg-primary px-3 py-1 text-sm font-bold text-white drop-shadow-md transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         :class="isTagSelected(tag) ? 'opacity-100' : 'opacity-50'"
         :aria-pressed="isTagSelected(tag)"
         @click="toggleTag(tag)"
@@ -56,7 +56,7 @@
     <p v-if="store.state.loading && !store.state.ready" role="status">Loading recipes…</p>
     <ul v-else-if="recipes.length">
       <li v-for="recipe in recipes" :key="recipe.id" class="my-2">
-        <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-list="recipe.ingredients" :tags="recipe.tags" />
+        <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-list="recipe.ingredients" :tags="recipe.tags" :cookbook="cookbookById.get(recipe.cookbookId)" />
       </li>
     </ul>
     <p v-else-if="!store.state.error" role="status">{{ store.state.recipes.length ? 'No recipes match your filters.' : 'No recipes yet.' }} <RouterLink v-if="!store.state.recipes.length" :to="newRecipeRoute" class="text-primary underline">Create a recipe</RouterLink></p>
@@ -88,6 +88,7 @@ const cookbookStyle = (cookbook) => {
   return { backgroundColor: color, color: lightColor ? '#1F2937' : '#FFFFFF' };
 };
 const cookbooks = computed(() => [...new Map([...store.state.cookbooks, ...store.state.sharedCookbooks].map((book) => [book.id, book])).values()]);
+const cookbookById = computed(() => new Map(cookbooks.value.map((cookbook) => [cookbook.id, cookbook])));
 const hasCookbookFilter = computed(() => store.state.excludedCookbookIds.length > 0);
 const isCookbookSelected = (id) => !store.state.excludedCookbookIds.includes(id);
 const toggleCookbook = (id) => {

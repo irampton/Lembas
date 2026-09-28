@@ -20,11 +20,22 @@
     <div v-else>
       <div class="flex flex-row justify-between md:mx-5">
         <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
-        <div class="flex flex-row text-right md:mt-1 text-accent">
-          <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }" class="rounded p-2 hover:bg-base-alt" aria-label="Edit recipe">
-            <PencilIcon class="size-6 md:size-8" />
-          </RouterLink>
-          <ArrowUpOnSquareIcon class="mt-2 size-6 md:size-8" />
+        <div class="flex flex-row items-center text-right md:mt-1 text-accent">
+          <div v-if="recipeCookbook" class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold"
+            :style="cookbookPillStyle" :title="recipeCookbook.name">
+            {{ recipeCookbook.name }}
+          </div>
+          <div class="rounded-xl p-1 hover:bg-base-alt">
+            <RouterLink 
+            v-if="canEditRecipe" 
+            :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
+              aria-label="Edit recipe">
+              <PencilIcon class="size-6 md:size-8" />
+            </RouterLink>
+          </div>
+          <div class="rounded-xl p-1 hover:bg-base-alt">
+            <ArrowUpOnSquareIcon class="size-6 md:size-8" />
+          </div>
         </div>
       </div>
       <div class="text-light pb-1 pl-px pt-px md:ml-5">
@@ -44,30 +55,21 @@
             </div>
             <div class="flex flex-row">
               <div class="shrink-0 text-right">
-                <div
-                  v-for="(ingredient, index) in recipe.ingredients"
-                  :key="ingredient.id || index"
-                >
+                <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index">
                   <span class="text-light">{{
                     ingredient.quantity
                   }}</span>
                 </div>
               </div>
               <div class="pl-2 shrink-0 text-left">
-                <div
-                  v-for="(ingredient, index) in recipe.ingredients"
-                  :key="ingredient.id || index"
-                >
+                <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index">
                   <span class="text-light">{{
                     formatUnit(ingredient.unit, ingredient.quantity) || "&nbsp;"
                   }}</span>
                 </div>
               </div>
               <div class="pl-2 shrink-0">
-                <div
-                  v-for="(ingredient, index) in recipe.ingredients"
-                  :key="ingredient.id || index"
-                >
+                <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index">
                   <span class="text-left text-base-dark">{{
                     ingredient.name
                   }}</span>
@@ -82,14 +84,11 @@
             <div class="font-bold text-base-dark text-3xl pb-3 md:pb-2">
               Steps
             </div>
-            <div
-              v-for="(stepText, index) in recipe.steps"
-              :key="`step-${index}`"
-            >
+            <div v-for="(stepText, index) in recipe.steps" :key="`step-${index}`">
               <div class="flex flex-row my-2">
                 <div
                   class="border-solid border-2 border-accent rounded-4xl text-lg font-bold w-8 h-8 text-center p-0 text-accent shrink-0"
-                >
+                  :style="stepNumberStyle">
                   {{ index + 1 }}
                 </div>
                 <div class="ml-2 mt-[2.5px] grow">
@@ -117,10 +116,7 @@
       <div>
         <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 md:mt-4 m-2">
           <div class="flex flex-row flex-wrap gap-2">
-            <BaseTag
-              v-for="(tag, index) in recipe.tags"
-              :key="`${tag}-${index}`"
-            >
+            <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
               {{ tag }}
             </BaseTag>
           </div>
@@ -155,6 +151,28 @@ const recipe = computed(() =>
 const canEditRecipe = computed(
   () => !isShareRoute.value && recipe.value?.canEdit !== false,
 );
+const recipeCookbook = computed(() =>
+  recipe.value?.cookbookId
+    ? store.getCookbookById(recipe.value.cookbookId)
+    : null,
+);
+const stepNumberStyle = computed(() => {
+  const color = recipeCookbook.value?.color;
+  return color ? { borderColor: color, color } : {};
+});
+const cookbookPillStyle = computed(() => {
+  const color = recipeCookbook.value?.color || "#1D6AA3";
+  const hex = color.replace("#", "");
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  const lightColor =
+    Number.isNaN(red) || (red * 299 + green * 587 + blue * 114) / 1000 > 160;
+  return {
+    backgroundColor: color,
+    color: lightColor ? "#1F2937" : "#FFFFFF",
+  };
+});
 
 const servingSize = computed(() => {
   const verb = recipe.value?.servingsVerb === "Serves" ? "Serves" : "Makes";
