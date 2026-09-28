@@ -56,10 +56,11 @@
         </RouterLink>
         <RouterLink
           v-if="auth.canManageUsers()"
-          :to="{ name: 'admin-server-settings' }"
+          :to="{ name: 'admin-users' }"
           class="mt-2 flex items-center gap-2 text-accent hover:text-accent-alt"
+          @click="profileMenuOpen = false"
         >
-          <ServerStackIcon class="size-5 shrink-0" aria-hidden="true" />
+          <UsersIcon class="size-5 shrink-0" aria-hidden="true" />
           Admin
         </RouterLink>
         <button
@@ -131,7 +132,7 @@ import {
   Cog6ToothIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  ServerStackIcon,
+  UsersIcon,
   UserCircleIcon,
   UserGroupIcon,
   UserIcon,

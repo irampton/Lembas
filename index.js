@@ -88,10 +88,11 @@ const getLlmSettings = () => {
     model: (raw.model || "").trim(),
     apiKey: (raw.apiKey || "").trim(),
     visionCapable: Boolean(raw.visionCapable),
+    defaultUserAccess: raw.defaultUserAccess !== false,
   };
 };
 
-const getPublicLlmSettings = () => {
+const getPublicLlmSettings = (userId) => {
   const settings = getLlmSettings();
   return {
     enabled: settings.enabled,
@@ -99,6 +100,8 @@ const getPublicLlmSettings = () => {
     model: settings.model,
     hasApiKey: Boolean(settings.apiKey),
     visionCapable: settings.visionCapable,
+    defaultUserAccess: settings.defaultUserAccess,
+    userAccess: userId ? db.userHasLlmAccess(userId) : true,
   };
 };
 
@@ -153,13 +156,21 @@ app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
     return;
   }
 
+  if (!db.userHasLlmAccess(req.user.id)) {
+    res.status(403).json({ success: false, error: "LLM import access is disabled for your account." });
+    return;
+  }
+
   if (imageBase64 && !llmSettings.visionCapable) {
     res.status(400).json({ success: false, error: "The selected model does not support images." });
     return;
   }
 
+  const requestId = db.recordLlmRequest(req.user.id, Boolean(imageBase64));
+
   try {
-    const recipe = await buildRecipeFromText(incomingText.trim(), { ...llmSettings, imageBase64 });
+    const { recipe, usage } = await buildRecipeFromText(incomingText.trim(), { ...llmSettings, imageBase64 });
+    db.updateLlmRequestUsage(requestId, usage);
     res.json({ success: true, data: recipe });
   } catch (error) {
     console.error("[llm] import failed:", error);
@@ -168,11 +179,11 @@ app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
 });
 
 app.get("/api/settings", auth.requireAuth, (req, res) => {
-  res.json({ success: true, settings: { llm: getPublicLlmSettings() } });
+  res.json({ success: true, settings: { llm: getPublicLlmSettings(req.user.id) } });
 });
 
 app.put("/api/admin/settings/llm", auth.requireAdmin, (req, res) => {
-  const { enabled, endpoint, model, apiKey, visionCapable } = req.body || {};
+  const { enabled, endpoint, model, apiKey, visionCapable, defaultUserAccess } = req.body || {};
   const current = getLlmSettings();
   const normalizedModel = (model || "").trim();
   if (enabled && !normalizedModel) {
@@ -184,12 +195,36 @@ app.put("/api/admin/settings/llm", auth.requireAdmin, (req, res) => {
     endpoint: (endpoint || "").trim(),
     model: normalizedModel,
     visionCapable: Boolean(visionCapable),
+    defaultUserAccess: Boolean(defaultUserAccess),
     apiKey: typeof apiKey === "string" && apiKey.trim()
       ? apiKey.trim()
       : ((endpoint || "").trim() === current.endpoint ? current.apiKey : ""),
   };
   db.setSetting("llm", normalized);
-  res.json({ success: true, settings: { llm: getPublicLlmSettings() } });
+  res.json({ success: true, settings: { llm: getPublicLlmSettings(req.user.id) } });
+});
+
+const llmUsageRanges = {
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "1m": 30 * 24 * 60 * 60 * 1000,
+  all: null,
+};
+
+app.get("/api/admin/llm/users", auth.requireAdmin, (req, res) => {
+  const range = Object.hasOwn(llmUsageRanges, req.query.range) ? req.query.range : "7d";
+  const duration = llmUsageRanges[range];
+  const since = duration ? new Date(Date.now() - duration).toISOString() : null;
+  res.json({ success: true, users: db.getLlmUsageByUser(since), range });
+});
+
+app.patch("/api/admin/llm/users/:id", auth.requireAdmin, (req, res) => {
+  const enabled = Boolean(req.body?.enabled);
+  if (!db.updateUserLlmAccess(req.params.id, enabled)) {
+    res.status(404).json({ success: false, error: "User not found." });
+    return;
+  }
+  res.json({ success: true, enabled });
 });
 
 app.post("/api/admin/settings/llm/test", auth.requireAdmin, async (req, res) => {

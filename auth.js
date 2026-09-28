@@ -13,6 +13,7 @@ export const sanitizeUser = (user) =>
         displayName: user.displayName || user.username,
         onboardingComplete: Boolean(user.onboardingComplete),
         role: user.role,
+        llmAccess: Boolean(user.llmAccess),
         createdAt: user.createdAt,
       }
     : null;
@@ -124,6 +125,7 @@ export const signupHandler = async (req, res) => {
     displayName: trimmedUsername,
     passwordHash,
     role: codeRecord.role,
+    llmAccess: db.getSetting("llm", {})?.defaultUserAccess !== false,
     createdAt: now,
   });
   db.ensureDefaultCookbookForUser(user);

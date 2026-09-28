@@ -222,7 +222,17 @@ export const buildRecipeFromText = async (
     ? responseText(data)
     : data?.choices?.[0]?.message?.content ?? "";
   const parsed = jsonFromText(content);
-  return normalizeRecipe(parsed);
+  return {
+    recipe: normalizeRecipe(parsed),
+    usage: {
+      inputTokens: Number(
+        responsesApi ? data?.usage?.input_tokens : data?.usage?.prompt_tokens,
+      ) || 0,
+      outputTokens: Number(
+        responsesApi ? data?.usage?.output_tokens : data?.usage?.completion_tokens,
+      ) || 0,
+    },
+  };
 };
 
 export const testLlmEndpoint = async (endpoint, { apiKey, model } = {}) => {

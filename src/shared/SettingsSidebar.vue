@@ -61,6 +61,6 @@ const standardItems = [
 
 const adminItems = computed(() => auth.canManageUsers() ? [
   { label: 'Users', route: 'admin-users', icon: UsersIcon },
-  { label: 'Server settings', route: 'admin-server-settings', icon: ServerStackIcon },
+  { label: 'LLM Settings', route: 'admin-server-settings', icon: ServerStackIcon },
 ] : []);
 </script>

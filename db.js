@@ -21,6 +21,7 @@ db.exec(`
     passwordHash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'user')),
     onboardingComplete INTEGER NOT NULL DEFAULT 0,
+    llmAccess INTEGER NOT NULL DEFAULT 1,
     createdAt TEXT NOT NULL
   );
 
@@ -49,6 +50,17 @@ db.exec(`
     value TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS llm_requests (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    hasImage INTEGER NOT NULL DEFAULT 0,
+    inputTokens INTEGER NOT NULL DEFAULT 0,
+    outputTokens INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_llm_requests_user_created ON llm_requests(userId, createdAt);
 
   CREATE TABLE IF NOT EXISTS recipes (
     id TEXT PRIMARY KEY,
@@ -147,6 +159,7 @@ db.exec(`
 const userTableColumns = db.prepare("PRAGMA table_info('users')").all();
 const hasDisplayName = userTableColumns.some((col) => col.name === "displayName");
 const hasOnboardingComplete = userTableColumns.some((col) => col.name === "onboardingComplete");
+const hasLlmAccess = userTableColumns.some((col) => col.name === "llmAccess");
 if (!hasDisplayName) {
   db.exec("ALTER TABLE users ADD COLUMN displayName TEXT;");
 }
@@ -154,8 +167,19 @@ if (!hasOnboardingComplete) {
   // Existing accounts predate onboarding and should not be interrupted by it.
   db.exec("ALTER TABLE users ADD COLUMN onboardingComplete INTEGER NOT NULL DEFAULT 1;");
 }
+if (!hasLlmAccess) {
+  db.exec("ALTER TABLE users ADD COLUMN llmAccess INTEGER NOT NULL DEFAULT 1;");
+}
 db.exec("UPDATE users SET displayName = username WHERE displayName IS NULL OR displayName = '';");
 db.exec("UPDATE users SET username = lower(username);");
+
+const llmRequestColumns = db.prepare("PRAGMA table_info('llm_requests')").all();
+if (!llmRequestColumns.some((col) => col.name === "inputTokens")) {
+  db.exec("ALTER TABLE llm_requests ADD COLUMN inputTokens INTEGER NOT NULL DEFAULT 0;");
+}
+if (!llmRequestColumns.some((col) => col.name === "outputTokens")) {
+  db.exec("ALTER TABLE llm_requests ADD COLUMN outputTokens INTEGER NOT NULL DEFAULT 0;");
+}
 
 const joinCodeColumns = db.prepare("PRAGMA table_info('join_codes')").all();
 const hasMaxUses = joinCodeColumns.some((col) => col.name === "maxUses");
@@ -476,8 +500,8 @@ export const updateCookbook = (cookbook) => {
   return getCookbookById(cookbook.id);
 };
 
-const userColumns = "id, username, displayName, role, onboardingComplete, createdAt, passwordHash";
-const userSafeColumns = "id, username, displayName, role, onboardingComplete, createdAt";
+const userColumns = "id, username, displayName, role, onboardingComplete, llmAccess, createdAt, passwordHash";
+const userSafeColumns = "id, username, displayName, role, onboardingComplete, llmAccess, createdAt";
 
 const normalizeUsernameInput = (username) => (username || "").trim().toLowerCase();
 
@@ -498,11 +522,11 @@ export const getUsers = () => {
   return stmt.all();
 };
 
-export const createUser = ({ id, username, displayName, passwordHash, role, createdAt }) => {
+export const createUser = ({ id, username, displayName, passwordHash, role, llmAccess = true, createdAt }) => {
   const stmt = db.prepare(
-    "INSERT INTO users (id, username, displayName, passwordHash, role, createdAt) VALUES (@id, @username, @displayName, @passwordHash, @role, @createdAt)"
+    "INSERT INTO users (id, username, displayName, passwordHash, role, llmAccess, createdAt) VALUES (@id, @username, @displayName, @passwordHash, @role, @llmAccess, @createdAt)"
   );
-  stmt.run({ id, username, displayName: displayName || username, passwordHash, role, createdAt });
+  stmt.run({ id, username, displayName: displayName || username, passwordHash, role, llmAccess: llmAccess ? 1 : 0, createdAt });
   return findUserById(id);
 };
 
@@ -952,6 +976,47 @@ export const isCookbookEditor = (cookbookId, userId) => {
   return ["recipes", "cookbook"].includes(share?.accessLevel || (share?.canEdit ? "cookbook" : "view"));
 };
 
+export const userHasLlmAccess = (id) => {
+  const row = db.prepare("SELECT llmAccess FROM users WHERE id = ?").get(id);
+  return Boolean(row?.llmAccess);
+};
+
+export const updateUserLlmAccess = (id, enabled) => {
+  const info = db.prepare("UPDATE users SET llmAccess = ? WHERE id = ?").run(enabled ? 1 : 0, id);
+  return info.changes > 0;
+};
+
+export const recordLlmRequest = (userId, hasImage) => {
+  const id = crypto.randomUUID();
+  db.prepare("INSERT INTO llm_requests (id, userId, createdAt, hasImage) VALUES (?, ?, ?, ?)")
+    .run(id, userId, new Date().toISOString(), hasImage ? 1 : 0);
+  return id;
+};
+
+export const updateLlmRequestUsage = (id, { inputTokens = 0, outputTokens = 0 } = {}) => {
+  db.prepare("UPDATE llm_requests SET inputTokens = ?, outputTokens = ? WHERE id = ?")
+    .run(Math.max(0, Number(inputTokens) || 0), Math.max(0, Number(outputTokens) || 0), id);
+};
+
+export const getLlmUsageByUser = (since = null) => db.prepare(`
+  SELECT u.id, u.username, u.displayName, u.role, u.llmAccess,
+         COUNT(r.id) AS requestCount,
+         COALESCE(SUM(r.hasImage), 0) AS imageCount,
+         COALESCE(SUM(r.inputTokens), 0) AS inputTokens,
+         COALESCE(SUM(r.outputTokens), 0) AS outputTokens
+  FROM users u
+  LEFT JOIN llm_requests r ON r.userId = u.id AND (? IS NULL OR r.createdAt >= ?)
+  GROUP BY u.id
+  ORDER BY requestCount DESC, u.username COLLATE NOCASE ASC
+`).all(since, since).map((row) => ({
+  ...row,
+  llmAccess: Boolean(row.llmAccess),
+  requestCount: Number(row.requestCount) || 0,
+  imageCount: Number(row.imageCount) || 0,
+  inputTokens: Number(row.inputTokens) || 0,
+  outputTokens: Number(row.outputTokens) || 0,
+}));
+
 export const isCookbookManager = (cookbookId, userId) => {
   const cookbook = getCookbookById(cookbookId);
   if (!cookbook) return false;
@@ -983,7 +1048,7 @@ export const countOwners = () => {
 
 const sessionWithUserStmt = db.prepare(`
   SELECT sessions.id as sessionId, sessions.userId, sessions.createdAt as sessionCreatedAt, sessions.expiresAt,
-         users.id, users.username, users.displayName, users.role, users.onboardingComplete, users.createdAt
+         users.id, users.username, users.displayName, users.role, users.onboardingComplete, users.llmAccess, users.createdAt
   FROM sessions
   JOIN users ON users.id = sessions.userId
   WHERE sessions.id = ?
@@ -1010,6 +1075,7 @@ export const getSessionWithUser = (sessionId) => {
       displayName: row.displayName,
       role: row.role,
       onboardingComplete: row.onboardingComplete,
+      llmAccess: row.llmAccess,
       createdAt: row.createdAt,
     },
   };

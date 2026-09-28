@@ -4,20 +4,18 @@
     <section class="min-w-0 flex-1">
       <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <div class="text-3xl font-bold md:text-4xl">Server Settings</div>
+            <div class="text-3xl font-bold md:text-4xl">LLM Settings</div>
         </div>
       </header>
 
-      <div class="flex flex-col md:flex-row gap-4">
-        <form class="rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6 h-min grow" @submit.prevent="save">
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start">
+        <form class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6" @submit.prevent="save">
           <div class="mb-6 flex items-start justify-between gap-5 border-b border-accent-alt/15 pb-6">
             <div>
               <h2 class="text-xl font-bold">Recipe Import via LLM</h2>
             </div>
-            <label class="relative inline-flex shrink-0 cursor-pointer items-center"
-              aria-label="Enable LLM recipe import"><input v-model="form.enabled" type="checkbox" :disabled="!form.model && !form.enabled"
-                class="peer sr-only" /><span
-                class="h-7 w-12 rounded-full bg-gray-300 transition-colors after:absolute after:left-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-40 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"></span></label>
+            <BaseToggle v-model="form.enabled" :disabled="!form.model && !form.enabled" aria-label="Enable LLM recipe import" />
           </div>
 
           <div class="flex flex-col gap-4">
@@ -45,10 +43,12 @@
 
             <label class="flex items-center justify-between gap-4 font-bold">
               Vision capable
-              <span class="relative inline-flex shrink-0 items-center">
-                <input v-model="form.visionCapable" type="checkbox" class="peer sr-only" :disabled="!form.model" />
-                <span class="h-7 w-12 rounded-full bg-gray-300 transition-colors after:absolute after:left-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-5 peer-disabled:opacity-40"></span>
-              </span>
+              <BaseToggle v-model="form.visionCapable" :disabled="!form.model" />
+            </label>
+
+            <label class="flex items-center justify-between gap-4 font-bold">
+              New user access
+              <BaseToggle v-model="form.defaultUserAccess" />
             </label>
           </div>
 
@@ -67,17 +67,6 @@
               </span></BaseButton>
             <BaseButton colorType="cancelAlt" :disabled="status.loading || settingsStore.state.saving" @click="resetForm">
               Reset</BaseButton>
-            <BaseButton
-              colorType="cancelAlt"
-              :disabled="status.loading || settingsStore.state.saving || testStatus.testing || !form.endpoint.trim() || !form.model"
-              @click="testEndpoint"
-            >
-              <span class="flex items-center gap-2">
-                <ArrowPathIcon v-if="testStatus.testing" class="size-5 animate-spin" />
-                <SignalIcon v-else class="size-5" />
-                {{ testStatus.testing ? 'Testing…' : 'Test endpoint' }}
-              </span>
-            </BaseButton>
           </div>
         </form>
 
@@ -91,7 +80,49 @@
           <p class="mt-4 text-sm" :class="testStatus.error ? 'text-error' : 'text-light'">
             {{ statusMessage }}
           </p>
+          <BaseButton
+            class="mt-5"
+            colorType="cancelAlt"
+            :disabled="status.loading || settingsStore.state.saving || testStatus.testing || !form.endpoint.trim() || !form.model"
+            @click="testEndpoint"
+          >
+            <span class="flex items-center gap-2">
+              <ArrowPathIcon v-if="testStatus.testing" class="size-5 animate-spin" />
+              <SignalIcon v-else class="size-5" />
+              {{ testStatus.testing ? 'Testing…' : 'Test endpoint' }}
+            </span>
+          </BaseButton>
         </aside>
+        </div>
+
+        <section class="w-full rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <h2 class="text-xl font-bold">User access</h2>
+            <BaseSplitButton
+              v-model="usage.range"
+              :options="usageRanges"
+              aria-label="Usage period"
+            />
+          </div>
+          <p v-if="usage.loading" class="py-5 text-center text-light">Loading…</p>
+          <ul v-else class="flex flex-col divide-y divide-accent-alt/15">
+            <li v-for="user in usage.users" :key="user.id" class="flex items-center justify-between gap-4 py-3">
+              <div class="min-w-0">
+                <p class="truncate font-bold">{{ user.displayName || user.username }}</p>
+                <p class="text-sm text-light">
+                  {{ formatNumber(user.requestCount) }} requests · {{ formatNumber(user.imageCount) }} images ·
+                  {{ formatNumber(user.inputTokens) }} in · {{ formatNumber(user.outputTokens) }} out
+                </p>
+              </div>
+              <BaseToggle
+                :model-value="user.llmAccess"
+                :disabled="usage.updatingUserId === user.id"
+                :aria-label="`LLM access for ${user.username}`"
+                @update:model-value="updateUserAccess(user, $event)"
+              />
+            </li>
+          </ul>
+        </section>
       </div>
     </section>
   </main>
@@ -102,11 +133,21 @@ import { computed, onBeforeUnmount, onMounted, reactive, watch } from 'vue';
 import { ArrowPathIcon, CheckCircleIcon, CheckIcon, SignalIcon } from '@heroicons/vue/24/outline';
 import BaseButton from '../../baseComponents/BaseButton.vue';
 import BaseDropdown from '../../baseComponents/BaseDropdown.vue';
+import BaseSplitButton from '../../baseComponents/BaseSplitButton.vue';
 import BaseTextInput from '../../baseComponents/BaseTextInput.vue';
+import BaseToggle from '../../baseComponents/BaseToggle.vue';
 import SettingsSidebar from '../../shared/SettingsSidebar.vue';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 const settingsStore = useSettingsStore();
+
+const usageRanges = [
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: '1m', label: '30d' },
+  { value: 'all', label: 'All' },
+];
+const formatNumber = (value) => new Intl.NumberFormat().format(Number(value) || 0);
 
 const status = reactive({
   loading: true,
@@ -121,6 +162,14 @@ const form = reactive({
   apiKey: '',
   hasApiKey: false,
   visionCapable: false,
+  defaultUserAccess: true,
+});
+
+const usage = reactive({
+  range: '7d',
+  users: [],
+  loading: false,
+  updatingUserId: '',
 });
 
 const modelStatus = reactive({
@@ -138,7 +187,9 @@ const testStatus = reactive({
 });
 
 const llmSettings = computed(() => settingsStore.getLlmSettings());
-const llmAvailable = computed(() => settingsStore.isLlmEnabled());
+const llmAvailable = computed(() => Boolean(
+  llmSettings.value.enabled && llmSettings.value.endpoint && llmSettings.value.model,
+));
 const modelOptions = computed(() => {
   const models = new Set(modelStatus.models);
   if (form.model) models.add(form.model);
@@ -170,6 +221,7 @@ const syncForm = () => {
   form.apiKey = '';
   form.hasApiKey = Boolean(llmSettings.value.hasApiKey);
   form.visionCapable = Boolean(llmSettings.value.visionCapable);
+  form.defaultUserAccess = llmSettings.value.defaultUserAccess !== false;
 };
 
 const resetForm = () => {
@@ -258,12 +310,50 @@ const testEndpoint = async () => {
   }
 };
 
+const loadUsage = async () => {
+  usage.loading = true;
+  status.error = null;
+  try {
+    const res = await fetch(`/api/admin/llm/users?range=${encodeURIComponent(usage.range)}`, {
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to load LLM usage.');
+    usage.users = data.users || [];
+  } catch (error) {
+    status.error = error?.message || 'Unable to load LLM usage.';
+  } finally {
+    usage.loading = false;
+  }
+};
+
+const updateUserAccess = async (user, enabled) => {
+  usage.updatingUserId = user.id;
+  status.error = null;
+  try {
+    const res = await fetch(`/api/admin/llm/users/${user.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ enabled }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data?.error || 'Unable to update LLM access.');
+    user.llmAccess = enabled;
+  } catch (error) {
+    status.error = error?.message || 'Unable to update LLM access.';
+  } finally {
+    usage.updatingUserId = '';
+  }
+};
+
 const load = async () => {
   status.loading = true;
   status.error = null;
   try {
     await settingsStore.loadSettings(true);
     syncForm();
+    await loadUsage();
   } catch (error) {
     status.error = error?.message || 'Unable to load settings.';
   } finally {
@@ -284,6 +374,7 @@ const save = async () => {
       endpoint: form.endpoint,
       model: form.model,
       visionCapable: form.visionCapable,
+      defaultUserAccess: form.defaultUserAccess,
       ...(form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {}),
     });
     status.saved = true;
@@ -296,6 +387,8 @@ const save = async () => {
 onMounted(async () => {
   await load();
 });
+
+watch(() => usage.range, loadUsage);
 
 onBeforeUnmount(() => clearTimeout(modelLoadTimer));
 </script>

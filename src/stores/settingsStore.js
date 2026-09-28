@@ -17,6 +17,8 @@ const normalizeSettings = (incoming) => {
       model: (llm.model || '').trim(),
       hasApiKey: Boolean(llm.hasApiKey),
       visionCapable: Boolean(llm.visionCapable),
+      defaultUserAccess: llm.defaultUserAccess !== false,
+      userAccess: llm.userAccess !== false,
     },
   };
 };
@@ -97,7 +99,8 @@ const reset = () => {
 const getLlmSettings = () => state.settings.llm || { enabled: false, endpoint: '' };
 const isLlmEnabled = () => Boolean(getLlmSettings().enabled)
   && Boolean(getLlmSettings().endpoint)
-  && Boolean(getLlmSettings().model);
+  && Boolean(getLlmSettings().model)
+  && getLlmSettings().userAccess !== false;
 
 export const useSettingsStore = () => ({
   state,
