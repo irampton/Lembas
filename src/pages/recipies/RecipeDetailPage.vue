@@ -21,18 +21,59 @@
       <div class="flex flex-row justify-between md:mx-5">
         <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
         <div class="flex flex-row items-center text-right md:mt-1 text-accent">
-          <div v-if="recipeCookbook" class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold"
+          <div v-if="!isShareRoute && recipeCookbook" class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold"
             :style="cookbookPillStyle" :title="recipeCookbook.name">
             {{ recipeCookbook.name }}
           </div>
-          <div class="rounded-xl p-1 hover:bg-base-alt">
+          <button
+            v-if="isShareRoute && auth.state.user"
+            type="button"
+            class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-alt"
+            @click="addToMyRecipes"
+          >
+            Add to my recipes
+          </button>
+          <div v-if="!isShareRoute" class="rounded-xl p-1 hover:bg-base-alt">
             <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
               aria-label="Edit recipe">
               <PencilIcon class="size-6 md:size-8" />
             </RouterLink>
           </div>
-          <div class="rounded-xl p-1 hover:bg-base-alt">
-            <ArrowUpOnSquareIcon class="size-6 md:size-8" />
+          <div v-if="canManageShare" class="relative">
+            <button
+              type="button"
+              class="rounded-xl p-1 hover:bg-base-alt"
+              aria-label="Share recipe"
+              :aria-expanded="shareMenuOpen"
+              @click.stop="toggleShareMenu"
+            >
+              <ArrowUpOnSquareIcon class="size-6 md:size-8" />
+            </button>
+            <BaseFloatingBox
+              v-if="shareMenuOpen"
+              class="absolute right-0 top-full z-10 mt-2 w-80 text-left"
+              @clickaway="shareMenuOpen = false"
+            >
+              <div class="flex items-center justify-between gap-4">
+                <span class="font-semibold text-base-dark">Anyone can view</span>
+                <BaseToggle
+                  :model-value="publicShareEnabled"
+                  :disabled="shareSaving"
+                  aria-label="Allow anyone with the link to view this recipe"
+                  @update:model-value="setPublicShare"
+                />
+              </div>
+              <template v-if="publicShareEnabled && shareLink">
+                <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-share-link">Share link</label>
+                <div class="mt-1 flex gap-2">
+                  <input id="recipe-share-link" :value="shareLink" readonly class="min-w-0 grow rounded-lg border border-primary-alt bg-base-alt px-2 py-1 text-sm text-base-dark" />
+                  <button type="button" class="rounded-lg bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-alt" @click="copyShareLink">
+                    {{ linkCopied ? 'Copied' : 'Copy' }}
+                  </button>
+                </div>
+              </template>
+              <p v-if="shareSettingsError" class="mt-3 text-sm text-error" role="alert">{{ shareSettingsError }}</p>
+            </BaseFloatingBox>
           </div>
         </div>
       </div>
@@ -140,21 +181,31 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { PencilIcon, ArrowUpOnSquareIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from "@heroicons/vue/24/outline";
+import BaseFloatingBox from "../../baseComponents/BaseFloatingBox.vue";
 import BaseTag from "../../baseComponents/BaseTag.vue";
 import BaseSplitButton from "../../baseComponents/BaseSplitButton.vue";
+import BaseToggle from "../../baseComponents/BaseToggle.vue";
+import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
 import { formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
 
 const store = useRecipeStore();
+const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 
 const sharedRecipe = ref(null);
 const shareError = ref(null);
 const shareLoading = ref(false);
 const detailLoading = ref(false);
 const detailError = ref(null);
+const shareMenuOpen = ref(false);
+const shareSaving = ref(false);
+const shareSettingsError = ref("");
+const publicShareToken = ref("");
+const linkCopied = ref(false);
 const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8]);
 const multiplierIndex = ref(MULTIPLIERS.indexOf(1));
 const unitSystem = ref("customary");
@@ -173,6 +224,14 @@ const recipe = computed(() =>
 const canEditRecipe = computed(
   () => !isShareRoute.value && recipe.value?.canEdit !== false,
 );
+const canManageShare = computed(() =>
+  !isShareRoute.value && recipe.value?.ownerId === auth.state.user?.id,
+);
+const publicShareEnabled = computed(() => Boolean(publicShareToken.value));
+const shareLink = computed(() => {
+  if (!publicShareToken.value) return "";
+  return `${window.location.origin}/share/${publicShareToken.value}`;
+});
 const hasNotes = computed(() => Boolean(recipe.value?.notes?.toString().trim()));
 const hasTags = computed(() =>
   (recipe.value?.tags || []).some((tag) =>
@@ -223,6 +282,55 @@ const increaseMultiplier = () => {
 };
 const decreaseMultiplier = () => {
   multiplierIndex.value = Math.max(multiplierIndex.value - 1, 0);
+};
+
+const addToMyRecipes = () => {
+  if (!sharedRecipe.value || !auth.state.user) return;
+  const { id, ownerId, cookbookId, isPublic, canEdit, ...draft } = sharedRecipe.value;
+  store.setImportedDraft(draft);
+  router.push({ name: "recipe-new" });
+};
+
+const toggleShareMenu = () => {
+  shareMenuOpen.value = !shareMenuOpen.value;
+  linkCopied.value = false;
+};
+
+const setPublicShare = async (enabled) => {
+  if (!recipe.value?.id || shareSaving.value) return;
+  shareSaving.value = true;
+  shareSettingsError.value = "";
+  try {
+    const res = await fetch(`/api/recipes/${recipe.value.id}/share/public`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ enabled }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data?.error || "Unable to update sharing settings.");
+    publicShareToken.value = data.share?.token || "";
+  } catch (error) {
+    shareSettingsError.value = error.message || "Unable to update sharing settings.";
+  } finally {
+    shareSaving.value = false;
+  }
+};
+
+const copyShareLink = async () => {
+  if (!shareLink.value) return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareLink.value);
+    } else {
+      const input = document.getElementById("recipe-share-link");
+      input?.select();
+      if (!document.execCommand("copy")) throw new Error("Copy failed.");
+    }
+    linkCopied.value = true;
+  } catch (error) {
+    shareSettingsError.value = "Unable to copy the share link.";
+  }
 };
 
 const FRACTIONS = Object.freeze({
@@ -281,7 +389,7 @@ const readableMetricUnit = (amount, dimension) => {
 
 const scaledIngredient = (ingredient) => {
   const original = ingredient.quantity?.toString?.().trim() || "";
-  if (multiplier.value === 1) {
+  if (multiplier.value === 1 && unitSystem.value === "customary") {
     return { quantity: original, unit: formatUnit(ingredient.unit, original) };
   }
   const amount = parseQuantity(original);
@@ -330,6 +438,10 @@ const loadSharedRecipe = async () => {
       credentials: "include",
     });
     const data = await res.json();
+    if (res.status === 404) {
+      router.replace({ name: "recipe-not-found" });
+      return;
+    }
     if (!res.ok || !data.success)
       throw new Error(data?.error || "Unable to load shared recipe.");
     sharedRecipe.value = data.recipe;
@@ -347,6 +459,10 @@ const loadRecipe = async () => {
   try {
     await store.loadRecipe(route.params.id);
   } catch (error) {
+    if (error.message === "Recipe not found.") {
+      router.replace({ name: "recipe-not-found" });
+      return;
+    }
     detailError.value = error.message || "Unable to load recipe.";
   } finally {
     detailLoading.value = false;
@@ -362,6 +478,12 @@ watch(
 watch(
   () => route.params.id,
   () => loadRecipe(),
+  { immediate: true },
+);
+
+watch(
+  () => recipe.value?.publicShareToken,
+  (token) => { publicShareToken.value = token || ""; },
   { immediate: true },
 );
 </script>

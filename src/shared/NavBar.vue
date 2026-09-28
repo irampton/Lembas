@@ -1,5 +1,20 @@
 <template>
-  <div class="w-full flex flex-row items-center justify-between sticky top-0 bg-primary p-4 z-100">
+  <div v-if="isPublicMinimalRoute && !auth.state.user" class="sticky top-0 z-100 flex w-full items-center justify-between bg-primary p-4">
+    <RouterLink
+      :to="auth.state.user ? { name: 'home' } : { name: 'login', query: { redirect: route.fullPath } }"
+      aria-label="Recipeas home"
+    >
+      <img src="/assets/banner.svg" alt="Recipeas" class="h-8 w-auto">
+    </RouterLink>
+    <RouterLink
+      v-if="!auth.state.user"
+      :to="{ name: 'login', query: { redirect: route.fullPath } }"
+      class="rounded-lg px-3 py-1.5 font-semibold text-white hover:bg-white/15"
+    >
+      Log in
+    </RouterLink>
+  </div>
+  <div v-else class="w-full flex flex-row items-center justify-between sticky top-0 bg-primary p-4 z-100">
     <div class="flex items-center gap-4">
       <button
         type="button"
@@ -189,6 +204,9 @@ const recipes = useRecipeStore();
 const settings = useSettingsStore();
 const router = useRouter();
 const route = useRoute();
+const isPublicMinimalRoute = computed(() =>
+  ['recipe-share-view', 'recipe-not-found'].includes(route.name),
+);
 const addMenuOpen = ref(false);
 const profileMenuOpen = ref(false);
 const sidebarOpen = ref(false);

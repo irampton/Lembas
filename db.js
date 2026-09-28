@@ -609,6 +609,9 @@ export const getRecipeForUser = (id, userId) => {
     canManageCookbook: Boolean(row.userCanManageCookbook),
     isSharedCookbook: row.ownerId !== userId,
     isSummary: false,
+    // Only an owner receives the public token; other cookbook members still
+    // get the recipe itself without gaining control of its public link.
+    publicShareToken: row.ownerId === userId ? getPublicShare(id)?.token || "" : "",
   };
 };
 

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomePage from './pages/recipies/HomePage.vue';
 import RecipeDetailPage from './pages/recipies/RecipeDetailPage.vue';
+import RecipeNotFoundPage from './pages/recipies/RecipeNotFoundPage.vue';
 import RecipeFormPage from './pages/recipies/RecipeFormPage.vue';
 import RecipeImportPage from './pages/recipies/RecipeImportPage.vue';
 import CookbookSharePage from './pages/recipies/CookbookSharePage.vue';
@@ -20,6 +21,7 @@ const router = createRouter({
     { path: '/recipes/import', name: 'recipe-import', component: RecipeImportPage, meta: { requiresAuth: true } },
     { path: '/recipes/:id', name: 'recipe-detail', component: RecipeDetailPage, props: true, meta: { requiresAuth: true } },
     { path: '/recipes/:id/edit', name: 'recipe-edit', component: RecipeFormPage, props: true, meta: { requiresAuth: true } },
+    { path: '/recipe-not-found', name: 'recipe-not-found', component: RecipeNotFoundPage, meta: { allowShare: true } },
     { path: '/share/:token', name: 'recipe-share-view', component: RecipeDetailPage, props: true, meta: { allowShare: true } },
     { path: '/share/:token/edit', name: 'recipe-share-edit', component: RecipeFormPage, props: true, meta: { allowShare: true } },
     {

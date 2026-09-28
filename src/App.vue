@@ -1,7 +1,7 @@
 <template>
-  <NavBar v-if="auth.state.user" @go-home="goHome" />
+  <NavBar v-if="auth.state.user || ['recipe-share-view', 'recipe-not-found'].includes(route.name)" @go-home="goHome" />
   <RouterView :key="$route.fullPath" />
-  <WelcomePopup v-if="auth.state.user && auth.state.user.onboardingComplete === false" />
+  <WelcomePopup v-if="route.name !== 'recipe-not-found' && auth.state.user && auth.state.user.onboardingComplete === false" />
 </template>
 
 <script setup>
