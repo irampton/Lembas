@@ -59,7 +59,9 @@
         <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-list="recipe.ingredients" :tags="recipe.tags" :cookbook="cookbookById.get(recipe.cookbookId)" />
       </li>
     </ul>
-    <p v-else-if="!store.state.error" role="status">{{ store.state.recipes.length ? 'No recipes match your filters.' : 'No recipes yet.' }} <RouterLink v-if="!store.state.recipes.length" :to="newRecipeRoute" class="text-primary underline">Create a recipe</RouterLink></p>
+    <p v-else-if="!store.state.error" class="text-center text-light italic" role="status">
+      {{ store.state.recipes.length ? 'No recipes match your filters' : 'No recipes yet' }}
+    </p>
   </section>
 </template>
 <script setup>
