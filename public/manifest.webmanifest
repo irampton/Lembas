@@ -1,21 +1,23 @@
 {
-  "name": "Lembas",
-  "short_name": "Lembas",
+  "name": "Recipeas",
+  "short_name": "Recipeas",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff5eb",
-  "theme_color": "#e16b1b",
+  "theme_color": "#3db779",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/assests/icon-192.png",
+      "src": "/assets/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/assests/icon-512.png",
+      "src": "/assets/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

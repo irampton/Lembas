@@ -66,7 +66,7 @@ const extractTextFromImage = async (imageBase64) => {
         ? ".webp"
         : ".img";
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lembas-ocr-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "recipeas-ocr-"));
   const tmpPath = path.join(tmpDir, `upload${ext}`);
 
   fs.writeFileSync(tmpPath, parsed.buffer);

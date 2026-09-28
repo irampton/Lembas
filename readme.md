@@ -1,9 +1,9 @@
 
-# Lembas
+# Recipeas
 AI-powered, locally hosted recipe storage app.
 
 ## Description
-Lembas helps you capture, clean up, and share recipes while keeping everything on your own machine. It has a simple web-based frontend that supports OCR & local LLMs for turning your messy recpies into structured ingredients and steps.
+Recipeas helps you capture, clean up, and share recipes while keeping everything on your own machine. It has a simple web-based frontend that supports OCR & local LLMs for turning your messy recpies into structured ingredients and steps.
 
 ## Requirements
 - Node.js 18+ and npm

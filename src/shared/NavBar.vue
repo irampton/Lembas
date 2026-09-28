@@ -10,7 +10,9 @@
       >
         <Bars3Icon class="size-6" />
       </button>
-      <div class="cursor-pointer text-xl font-bold text-white" @click="$emit('go-home')">Lembas</div>
+      <button type="button" class="cursor-pointer" aria-label="Go to home" @click="$emit('go-home')">
+        <img src="/assets/banner.svg" alt="Recipeas" class="h-8 w-auto">
+      </button>
     </div>
     <div class="relative w-1/3 max-w-md">
       <MagnifyingGlassIcon class="absolute right-3 top-1/2 size-5 -translate-y-1/2 text-gray-500" />
