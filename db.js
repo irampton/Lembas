@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { buildIngredientPreview } from "./src/utils/ingredientPreview.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +76,7 @@ db.exec(`
     createdAt TEXT NOT NULL,
     tags TEXT DEFAULT '[]',
     ingredients TEXT DEFAULT '[]',
+    ingredientPreview TEXT DEFAULT '',
     steps TEXT DEFAULT '[]',
     ownerId TEXT NOT NULL,
     cookbookId TEXT,
@@ -217,6 +219,7 @@ const hasServingsVerb = recipeColumns.some((col) => col.name === "servingsVerb")
 const hasServingsQuantity = recipeColumns.some((col) => col.name === "servingsQuantity");
 const hasServingsUnit = recipeColumns.some((col) => col.name === "servingsUnit");
 const hasCookbookId = recipeColumns.some((col) => col.name === "cookbookId");
+const hasIngredientPreview = recipeColumns.some((col) => col.name === "ingredientPreview");
 if (!hasServingsVerb) {
   db.exec("ALTER TABLE recipes ADD COLUMN servingsVerb TEXT DEFAULT 'Makes';");
 }
@@ -228,6 +231,14 @@ if (!hasServingsUnit) {
 }
 if (!hasCookbookId) {
   db.exec("ALTER TABLE recipes ADD COLUMN cookbookId TEXT;");
+}
+if (!hasIngredientPreview) {
+  db.exec("ALTER TABLE recipes ADD COLUMN ingredientPreview TEXT DEFAULT '';");
+  const previews = db.prepare("SELECT id, ingredients FROM recipes").all();
+  const updatePreview = db.prepare("UPDATE recipes SET ingredientPreview = ? WHERE id = ?");
+  db.transaction(() => previews.forEach((recipe) => {
+    updatePreview.run(buildIngredientPreview(parseJson(recipe.ingredients, [])), recipe.id);
+  }))();
 }
 try {
   const recipeColumnsPost = db.prepare("PRAGMA table_info('recipes')").all();
@@ -311,6 +322,7 @@ const rowToRecipe = (row) => ({
   createdAt: row.createdAt,
   tags: parseJson(row.tags, []),
   ingredients: parseJson(row.ingredients, []),
+  ingredientPreview: row.ingredientPreview || "",
   steps: parseJson(row.steps, []),
   ownerId: row.ownerId || "",
   cookbookId: row.cookbookId || "",
@@ -331,6 +343,7 @@ const rowToRecipeSummary = (row) => ({
   ingredients: parseJson(row.ingredients, []).map((ingredient) => ({
     name: typeof ingredient === "string" ? ingredient : ingredient?.name || "",
   })),
+  ingredientPreview: row.ingredientPreview || "",
   steps: parseJson(row.steps, []),
   ownerId: row.ownerId || "",
   cookbookId: row.cookbookId || "",
@@ -349,6 +362,7 @@ const serializeRecipe = (recipe) => ({
   createdAt: recipe.createdAt,
   tags: JSON.stringify(recipe.tags ?? []),
   ingredients: JSON.stringify(recipe.ingredients ?? []),
+  ingredientPreview: buildIngredientPreview(recipe.ingredients),
   steps: JSON.stringify(recipe.steps ?? []),
   ownerId: recipe.ownerId ?? "",
   cookbookId: recipe.cookbookId ?? "",
@@ -397,8 +411,8 @@ export const getRecipeById = (id, ownerId) => {
 
 export const saveRecipe = (recipe) => {
   const upsertStmt = db.prepare(`
-    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, steps, ownerId, isPublic, notes, servingsVerb, servingsQuantity, servingsUnit, cookbookId)
-    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @steps, @ownerId, @isPublic, @notes, @servingsVerb, @servingsQuantity, @servingsUnit, @cookbookId)
+    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, ingredientPreview, steps, ownerId, isPublic, notes, servingsVerb, servingsQuantity, servingsUnit, cookbookId)
+    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @ingredientPreview, @steps, @ownerId, @isPublic, @notes, @servingsVerb, @servingsQuantity, @servingsUnit, @cookbookId)
     ON CONFLICT(id) DO UPDATE SET
       title=excluded.title,
       description=excluded.description,
@@ -406,6 +420,7 @@ export const saveRecipe = (recipe) => {
       createdAt=excluded.createdAt,
       tags=excluded.tags,
       ingredients=excluded.ingredients,
+      ingredientPreview=excluded.ingredientPreview,
       steps=excluded.steps,
       ownerId=excluded.ownerId,
       isPublic=excluded.isPublic,
@@ -1119,7 +1134,7 @@ export const getLibraryForUser = (userId) => {
   // library loads and post-save broadcasts progressively slower as libraries grew.
   const recipeRows = db.prepare(`
     SELECT r.id, r.title, r.description, r.author, r.createdAt, r.tags,
-           r.ingredients, r.steps, r.ownerId, r.cookbookId, r.notes,
+           r.ingredients, r.ingredientPreview, r.steps, r.ownerId, r.cookbookId, r.notes,
            r.servingsVerb, r.servingsQuantity, r.servingsUnit,
            CASE
              WHEN cb.ownerId = @userId THEN 1

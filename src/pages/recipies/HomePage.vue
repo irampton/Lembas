@@ -58,7 +58,7 @@
     </p>
     <ul v-else-if="recipes.length">
       <li v-for="recipe in recipes" :key="recipe.id" class="my-2">
-        <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-list="recipe.ingredients" :tags="recipe.tags" :cookbook="cookbookById.get(recipe.cookbookId)" />
+        <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-preview="recipe.ingredientPreview" :tags="recipe.tags" :cookbook="cookbookById.get(recipe.cookbookId)" />
       </li>
     </ul>
     <p v-else-if="!store.state.error" class="text-center text-light italic" role="status">

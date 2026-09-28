@@ -56,6 +56,7 @@ const applyRecipe = (recipe) => {
   const summary = recipe.isSummary ? recipe : {
     ...recipe,
     ingredients: (recipe.ingredients || []).map((ingredient) => ({ name: ingredient?.name || '' })),
+    ingredientPreview: recipe.ingredientPreview || '',
     isSummary: true,
   };
   state.recipes = sortByTitle(state.recipes.some((item) => item.id === summary.id)

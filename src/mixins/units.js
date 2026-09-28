@@ -72,8 +72,19 @@ UNITS.forEach((definition) => {
 export const getUnit = (value) => unitLookup.get(cleanUnit(value));
 export const normalizeUnit = (value) => getUnit(value)?.value || '';
 
-const parseQuantity = (quantity) => {
-  const parts = (quantity || '').toString().trim().split(/\s+/).filter(Boolean);
+const unicodeFractions = Object.freeze({
+  '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4',
+  '⅕': '1/5', '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6',
+  '⅚': '5/6', '⅐': '1/7', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8',
+  '⅞': '7/8', '⅑': '1/9', '⅒': '1/10',
+});
+
+export const parseQuantity = (quantity) => {
+  const normalized = (quantity || '').toString().replace(
+    /[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞⅑⅒]/g,
+    (fraction) => ` ${unicodeFractions[fraction]} `,
+  );
+  const parts = normalized.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return null;
   let total = 0;
   for (const part of parts) {
@@ -88,6 +99,17 @@ const parseQuantity = (quantity) => {
     }
   }
   return total;
+};
+
+// This provides a common magnitude for preview sorting. Dimensions remain
+// intentionally approximate across mass, volume, and count, but equivalent
+// units within each dimension (for example cups and tablespoons) compare
+// correctly using the conversion table above.
+export const comparableQuantity = (quantity, unitValue) => {
+  const definition = getUnit(unitValue);
+  const amount = parseQuantity(quantity);
+  if (!definition?.conversion || !Number.isFinite(amount)) return null;
+  return amount * definition.conversion.factor;
 };
 
 export const formatUnit = (value, quantity) => {

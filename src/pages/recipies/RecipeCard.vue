@@ -12,7 +12,7 @@
         {{ cookbook.name }}
       </span>
     </div>
-    <div class="truncate ml-px text-sm text-light" :title="ingredientSummary">{{ ingredientSummary }}</div>
+    <div class="truncate ml-px text-sm text-light" :title="ingredientPreview">{{ ingredientPreview }}</div>
     <div class="truncate text-light mt-1 -ml-2">
       <BaseTag v-for="(tag, index) in normalizedTags" :key="`${tag.name}-${index}`" :color="tag.color" class="ml-1 align-middle">{{ tag.name }}</BaseTag>
     </div>
@@ -25,21 +25,12 @@ import BaseTag from '../../baseComponents/BaseTag.vue';
 const props = defineProps({
   recipeId: { type: [String, Number], required: true },
   recipeName: { type: String, default: '' },
-  ingredientList: { type: Array, default: () => [] },
+  ingredientPreview: { type: String, default: '' },
   tags: { type: Array, default: () => [] },
   cookbook: { type: Object, default: null },
 });
 const router = useRouter();
 const openRecipe = () => router.push({ name: 'recipe-detail', params: { id: props.recipeId } });
-// Handle decimal quantities, fractions, and mixed numbers such as "1 1/2".
-const amount = (quantity) => String(quantity ?? '').trim().split(/\s+/).reduce((total, part) => {
-  const [numerator, denominator] = part.split('/').map(Number);
-  const value = denominator === undefined ? numerator : denominator ? numerator / denominator : 0;
-  return total + (Number.isFinite(value) ? value : 0);
-}, 0);
-const ingredientSummary = computed(() => [...props.ingredientList]
-  .sort((a, b) => amount(b.quantity) - amount(a.quantity))
-  .map((item) => typeof item === 'string' ? item : item.name).filter(Boolean).join(', '));
 const normalizedTags = computed(() => props.tags.map((tag) => typeof tag === 'string' ? { name: tag } : tag).filter((tag) => tag?.name));
 const cookbookStyle = computed(() => {
   const color = props.cookbook?.color || '#1D6AA3';
