@@ -1,9 +1,10 @@
 <template>
   <span class="relative" :class="{ 'cursor-pointer': usePointer && hasConversions }"
-    @mouseenter="canOpen && (open = true)" @mouseleave="open = false">
+    @mouseenter="canOpen && (open = true)" @mouseleave="open = false" @click="toggleOnTouch">
     <slot />
     <BaseFloatingBox
       v-if="open && canOpen"
+      @clickaway="open = false"
       :class="sidePlacement
         ? 'absolute right-full top-0 z-20 -mt-3 mr-2 w-max whitespace-nowrap text-left text-sm'
         : 'absolute left-0 top-full z-20 mt-2 w-max whitespace-nowrap text-left text-sm'"
@@ -211,4 +212,15 @@ const allConversions = computed(() => {
 });
 const hasConversions = computed(() => allConversions.value.length > 0);
 const canOpen = computed(() => hasConversions.value || props.showWhenEmpty);
+
+const toggleOnTouch = (event) => {
+  // Safari on iOS does not consistently synthesize mouseenter for a tap, so
+  // hover alone leaves the conversion list inaccessible there. Keep mouse
+  // hover unchanged, but let a touch tap open the same floating box.
+  const isTouch = event.pointerType === "touch"
+    || (!event.pointerType && window.matchMedia?.("(hover: none), (pointer: coarse)").matches);
+  if (!isTouch || !canOpen.value) return;
+  event.stopPropagation();
+  open.value = true;
+};
 </script>
