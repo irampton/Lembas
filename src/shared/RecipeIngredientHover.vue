@@ -8,9 +8,14 @@
         ? 'absolute right-full top-0 z-20 -mt-3 mr-2 w-max whitespace-nowrap text-left text-sm'
         : 'absolute left-0 top-full z-20 mt-2 w-max whitespace-nowrap text-left text-sm'"
     >
-      <div class="font-semibold text-base-dark">{{ headerText }}</div>
-      <div v-for="conversion in allConversions" :key="conversion.unit" class="text-light">
-        {{ conversion.amount }} {{ conversion.label }}
+      <div class="flex font-semibold text-base-dark">
+        <span class="w-8 shrink-0 text-right mr-1">{{ primaryQuantity }}</span>
+        <span>{{ primaryUnit }}</span>
+        <span v-if="!hasConversions && ingredientName" class="ml-1">{{ ingredientName }}</span>
+      </div>
+      <div v-for="conversion in allConversions" :key="conversion.unit" class="flex text-light">
+        <span class="w-10 shrink-0 text-right mr-1">{{ conversion.amount }}</span>
+        <span>{{ conversion.label }}</span>
       </div>
     </BaseFloatingBox>
   </span>
@@ -37,7 +42,6 @@ const trigger = ref(null);
 const openedByTouch = ref(false);
 const definition = computed(() => getUnit(props.unit));
 const amount = computed(() => parseQuantity(props.quantity));
-const writtenAmount = computed(() => [props.quantity, props.writtenUnit || props.unit].filter(Boolean).join(" "));
 
 const targets = Object.freeze({
   volume: [
@@ -152,12 +156,8 @@ const selectorConversion = computed(() => {
     selected: true,
   };
 });
-const primaryAmount = computed(() => selectorConversion.value
-  ? `${selectorConversion.value.amount} ${selectorConversion.value.label}`
-  : writtenAmount.value);
-const headerText = computed(() => !hasConversions.value && props.ingredientName
-  ? [primaryAmount.value, props.ingredientName].filter(Boolean).join(" ")
-  : primaryAmount.value);
+const primaryQuantity = computed(() => selectorConversion.value?.amount || props.quantity);
+const primaryUnit = computed(() => selectorConversion.value?.label || props.writtenUnit || props.unit);
 const originalUnitConversion = computed(() => {
   // The source measurement is represented by the heading when no mode is
   // selected. Once a mode is selected, retain it in its natural group unless
