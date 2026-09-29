@@ -1,10 +1,9 @@
 <template>
-  <span class="relative" :class="{ 'cursor-pointer': usePointer && hasConversions }"
-    @mouseenter="canOpen && (open = true)" @mouseleave="open = false" @click="toggleOnTouch">
+  <span ref="trigger" class="relative" :class="{ 'cursor-pointer': usePointer && hasConversions }"
+    @mouseenter="openOnMouseEnter" @mouseleave="closeOnMouseLeave" @click="toggleOnTouch">
     <slot />
     <BaseFloatingBox
       v-if="open && canOpen"
-      @clickaway="open = false"
       :class="sidePlacement
         ? 'absolute right-full top-0 z-20 -mt-3 mr-2 w-max whitespace-nowrap text-left text-sm'
         : 'absolute left-0 top-full z-20 mt-2 w-max whitespace-nowrap text-left text-sm'"
@@ -18,7 +17,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BaseFloatingBox from "../baseComponents/BaseFloatingBox.vue";
 import { convertIngredientUnit, formatMilliliters, getIngredientDensity, getUnit, parseQuantity } from "../mixins/units.js";
 
@@ -34,6 +33,8 @@ const props = defineProps({
 });
 
 const open = ref(false);
+const trigger = ref(null);
+const openedByTouch = ref(false);
 const definition = computed(() => getUnit(props.unit));
 const amount = computed(() => parseQuantity(props.quantity));
 const writtenAmount = computed(() => [props.quantity, props.writtenUnit || props.unit].filter(Boolean).join(" "));
@@ -213,6 +214,14 @@ const allConversions = computed(() => {
 const hasConversions = computed(() => allConversions.value.length > 0);
 const canOpen = computed(() => hasConversions.value || props.showWhenEmpty);
 
+const openOnMouseEnter = () => {
+  if (!openedByTouch.value && canOpen.value) open.value = true;
+};
+
+const closeOnMouseLeave = () => {
+  if (!openedByTouch.value) open.value = false;
+};
+
 const toggleOnTouch = (event) => {
   // Safari on iOS does not consistently synthesize mouseenter for a tap, so
   // hover alone leaves the conversion list inaccessible there. Keep mouse
@@ -221,6 +230,16 @@ const toggleOnTouch = (event) => {
     || (!event.pointerType && window.matchMedia?.("(hover: none), (pointer: coarse)").matches);
   if (!isTouch || !canOpen.value) return;
   event.stopPropagation();
+  openedByTouch.value = true;
   open.value = true;
 };
+
+const closeWhenTouchedElsewhere = (event) => {
+  if (!openedByTouch.value || trigger.value?.contains(event.target)) return;
+  openedByTouch.value = false;
+  open.value = false;
+};
+
+onMounted(() => document.addEventListener("pointerdown", closeWhenTouchedElsewhere));
+onBeforeUnmount(() => document.removeEventListener("pointerdown", closeWhenTouchedElsewhere));
 </script>
