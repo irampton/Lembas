@@ -211,7 +211,7 @@
 
         </div>
 
-        <div class="lg:w-[20%vw] shrink-0">
+        <div class="lg:w-[15vw] shrink-0">
 
           <div v-if="canViewPairings" class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
