@@ -1275,6 +1275,7 @@ export const getSessionWithUser = (sessionId) => {
 
   return {
     sessionId: row.sessionId,
+    sessionCreatedAt: row.sessionCreatedAt,
     expiresAt: row.expiresAt,
     user: {
       id: row.id,
@@ -1302,6 +1303,23 @@ export const createSession = (userId, ttlMs) => {
     expiresAt: expiresAt.toISOString(),
   });
   return { id, expiresAt: expiresAt.toISOString() };
+};
+
+// Extend an active session from the current request, without allowing it to
+// outlive the absolute lifetime measured from its original login.
+export const refreshSession = (session, ttlMs, maxAgeMs) => {
+  const now = new Date();
+  const maxExpiresAt = new Date(new Date(session.sessionCreatedAt).getTime() + maxAgeMs);
+  const refreshedExpiresAt = new Date(Math.min(now.getTime() + ttlMs, maxExpiresAt.getTime()));
+  const currentExpiresAt = new Date(session.expiresAt);
+  const expiresAt = currentExpiresAt > refreshedExpiresAt ? currentExpiresAt : refreshedExpiresAt;
+
+  if (expiresAt.getTime() !== currentExpiresAt.getTime()) {
+    db.prepare("UPDATE sessions SET expiresAt = ? WHERE id = ?")
+      .run(expiresAt.toISOString(), session.sessionId);
+  }
+
+  return expiresAt.toISOString();
 };
 
 export const deleteSession = (sessionId) => {
