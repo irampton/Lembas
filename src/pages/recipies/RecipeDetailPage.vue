@@ -178,7 +178,7 @@
                           :unit-system="selectedUnitSystem"
                           :written-unit="formatUnit(part.ingredient.unit, hoverQuantity(part.ingredient))"
                           show-when-empty>
-                          <span class="text-accent">{{ part.text }}</span>
+                          <span class="cursor-pointer text-accent">{{ part.text }}</span>
                         </RecipeIngredientHover>
                         <template v-else>{{ part.text }}</template>
                       </template>

@@ -8,7 +8,7 @@
         ? 'absolute right-full top-0 z-20 -mt-3 mr-2 w-max whitespace-nowrap text-left text-sm'
         : 'absolute left-0 top-full z-20 mt-2 w-max whitespace-nowrap text-left text-sm'"
     >
-      <div class="font-semibold text-base-dark">{{ primaryAmount }}</div>
+      <div class="font-semibold text-base-dark">{{ headerText }}</div>
       <div v-for="conversion in allConversions" :key="conversion.unit" class="text-light">
         {{ conversion.amount }} {{ conversion.label }}
       </div>
@@ -153,6 +153,9 @@ const selectorConversion = computed(() => {
 const primaryAmount = computed(() => selectorConversion.value
   ? `${selectorConversion.value.amount} ${selectorConversion.value.label}`
   : writtenAmount.value);
+const headerText = computed(() => !hasConversions.value && props.ingredientName
+  ? [primaryAmount.value, props.ingredientName].filter(Boolean).join(" ")
+  : primaryAmount.value);
 const originalUnitConversion = computed(() => {
   // The source measurement is represented by the heading when no mode is
   // selected. Once a mode is selected, retain it in its natural group unless
