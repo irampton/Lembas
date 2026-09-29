@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 lg:px-[15%]">
+  <div class="p-4 lg:px-[12%]">
     <div v-if="!isShareRoute && ((store.state.loading && !store.state.ready) || detailLoading)"
       class="flex flex-col items-center gap-3 text-center text-light italic" role="status">
       <BaseLoadingSpinner />
@@ -211,7 +211,7 @@
 
         </div>
 
-        <div class="lg:w-1/4 shrink-0">
+        <div class="lg:w-[20%vw] shrink-0">
 
           <div v-if="canViewPairings" class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
