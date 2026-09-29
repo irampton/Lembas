@@ -18,6 +18,7 @@
       :tabindex="option.value === modelValue ? 0 : -1"
       :disabled="disabled"
       @click="select(option.value)"
+      @dblclick.prevent="deselect(option.value)"
     >
       {{ option.label }}
     </button>
@@ -36,6 +37,7 @@ const props = defineProps({
     validator: (value) => ['action', 'submit', 'cancel', 'cancelAlt', 'delete'].includes(value),
   },
   disabled: { type: Boolean, default: false },
+  allowDeselect: { type: Boolean, default: false },
   ariaLabel: { type: String, default: 'Options' },
 });
 
@@ -57,6 +59,11 @@ const select = (value) => {
   if (props.disabled || value === props.modelValue) return;
   emit('update:modelValue', value);
   emit('change', value);
+};
+const deselect = (value) => {
+  if (props.disabled || !props.allowDeselect || value !== props.modelValue) return;
+  emit('update:modelValue', '');
+  emit('change', '');
 };
 const onKeydown = (event) => {
   if (props.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;

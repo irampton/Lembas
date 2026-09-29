@@ -130,6 +130,7 @@
                     </button>
                   </div>
                   <BaseSplitButton v-model="selectedUnitSystem" :options="unitSystemOptions" color-type="action"
+                    allow-deselect
                     class="[&>button]:h-7 [&>button]:px-2 [&>button]:text-xs" aria-label="Measurement system" />
                 </div>
                 <div>
@@ -375,6 +376,7 @@ const multiplierInputElement = ref(null);
 // null preserves a mixed recipe exactly as written.  A chosen mode then
 // standardizes every ingredient for which the conversion is meaningful.
 const unitSystem = ref(null);
+const showAsWritten = ref(false);
 const unitSystemOptions = Object.freeze([
   { value: "customary-volume", label: "C" },
   { value: "customary-mass", label: "Oz" },
@@ -404,8 +406,11 @@ const detectedUnitSystem = computed(() => {
   return modes.length && modes.every((mode) => mode === modes[0]) ? modes[0] : null;
 });
 const selectedUnitSystem = computed({
-  get: () => unitSystem.value || detectedUnitSystem.value || '',
-  set: (mode) => { unitSystem.value = mode; },
+  get: () => showAsWritten.value ? '' : unitSystem.value || detectedUnitSystem.value || '',
+  set: (mode) => {
+    showAsWritten.value = !mode;
+    unitSystem.value = mode || null;
+  },
 });
 const canEditRecipe = computed(
   () => !isShareRoute.value && recipe.value?.canEdit !== false,
@@ -792,7 +797,7 @@ const readableMetricUnit = (amount, dimension) => {
 
 const scaledIngredient = (ingredient) => {
   const original = ingredient.quantity?.toString?.().trim() || "";
-  const mode = unitSystem.value || detectedUnitSystem.value;
+  const mode = showAsWritten.value ? null : unitSystem.value || detectedUnitSystem.value;
   if (multiplier.value === 1 && !mode) {
     return { quantity: original, unit: formatUnit(ingredient.unit, original) };
   }
