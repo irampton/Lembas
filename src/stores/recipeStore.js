@@ -51,7 +51,15 @@ const applyLibrary = (payload) => {
 const applyRecipe = (recipe) => {
   if (!recipe?.id) return;
   if (!recipe.isSummary) {
-    state.recipeDetails[recipe.id] = recipe;
+    // Recipe updates do not include pairings because they are access-specific.
+    // Retain the loaded pairings until a pairing update explicitly refreshes them.
+    const existingDetail = state.recipeDetails[recipe.id];
+    state.recipeDetails[recipe.id] = {
+      ...recipe,
+      ...(!Object.hasOwn(recipe, 'pairings') && existingDetail?.pairings
+        ? { pairings: existingDetail.pairings }
+        : {}),
+    };
   }
   const summary = recipe.isSummary ? recipe : {
     ...recipe,

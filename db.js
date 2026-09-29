@@ -672,15 +672,19 @@ export const removeRecipePairing = (firstId, secondId) => {
   return info.changes > 0;
 };
 
-export const getRecipePairingsForUser = (recipeId, userId) => {
-  if (!recipeId || !userId) return [];
-  const rows = db.prepare(`
+export const getRecipePairingIds = (recipeId) => {
+  if (!recipeId) return [];
+  return db.prepare(`
     SELECT CASE WHEN recipeIdA = ? THEN recipeIdB ELSE recipeIdA END AS pairedRecipeId
     FROM recipe_pairings
     WHERE recipeIdA = ? OR recipeIdB = ?
-  `).all(recipeId, recipeId, recipeId);
-  return rows
-    .map(({ pairedRecipeId }) => getRecipeForUser(pairedRecipeId, userId, { includePairings: false }))
+  `).all(recipeId, recipeId, recipeId).map(({ pairedRecipeId }) => pairedRecipeId);
+};
+
+export const getRecipePairingsForUser = (recipeId, userId) => {
+  if (!recipeId || !userId) return [];
+  return getRecipePairingIds(recipeId)
+    .map((pairedRecipeId) => getRecipeForUser(pairedRecipeId, userId, { includePairings: false }))
     .filter(Boolean)
     .map((recipe) => ({ id: recipe.id, title: recipe.title }));
 };

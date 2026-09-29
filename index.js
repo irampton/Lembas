@@ -63,6 +63,23 @@ const emitRecipeRemoval = (recipe) => {
   });
 };
 
+const emitPairingUpdatesForRecipe = (recipe) => {
+  const pairedRecipeIds = db.getRecipePairingIds(recipe.id);
+  if (!pairedRecipeIds.length) return;
+
+  const affectedRecipeIds = [recipe.id, ...pairedRecipeIds];
+  const memberIds = new Set(db.listCookbookMemberIds(recipe.cookbookId));
+  pairedRecipeIds.forEach((pairedRecipeId) => {
+    const pairedRecipe = db.getRecipeByIdAnyOwner(pairedRecipeId);
+    if (pairedRecipe) {
+      db.listCookbookMemberIds(pairedRecipe.cookbookId).forEach((memberId) => memberIds.add(memberId));
+    }
+  });
+  memberIds.forEach((memberId) => {
+    io.to(`user:${memberId}`).emit("recipe:pairing-updated", { recipeIds: affectedRecipeIds });
+  });
+};
+
 app.use(express.json({ limit: "10mb" }));
 app.use(auth.attachSession);
 
@@ -937,6 +954,10 @@ app.put("/api/share/:token", async (req, res) => {
   normalized.history = historyForSave(recipe, normalized);
   const saved = db.saveRecipe(normalized);
   res.json({ success: true, recipe: saved });
+  setImmediate(() => {
+    emitRecipeUpdate(saved);
+    if (recipe.title !== saved.title) emitPairingUpdatesForRecipe(saved);
+  });
 });
 app.patch("/api/users/:id/role", auth.requireOwner, (req, res) => {
   const targetId = req.params.id;
@@ -1069,7 +1090,10 @@ io.on("connection", (socket) => {
     // Acknowledge the write before generating full library payloads for every
     // connected member. This keeps save latency independent of library size.
     reply({ success: true, data: saved });
-    setImmediate(() => emitRecipeUpdate(saved, previousCookbookId));
+    setImmediate(() => {
+      emitRecipeUpdate(saved, previousCookbookId);
+      if (existing?.title !== saved.title) emitPairingUpdatesForRecipe(saved);
+    });
   });
 
   socket.on("recipe:get", (id, ack) => {
