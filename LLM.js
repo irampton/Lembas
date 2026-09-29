@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { UNIT_VALUES, normalizeUnit } from "./src/mixins/units.js";
 const DEFAULT_MODEL = "GPT-OSS-20B";
-const PROMPT_CACHE_KEY = "lembas-recipe-import-v2";
+const PROMPT_CACHE_KEY = "lembas-recipe-import-v3";
 
 const usesResponsesApi = (endpoint) => {
   try {
@@ -83,11 +83,11 @@ Field rules:
 - title: Use the printed title. If absent, create a short factual title from the dish.
 - description: Use an explicit summary when present. Otherwise write one concise factual sentence based only on the recipe.
 - author: Use the named recipe author, creator, publication, or source. Do not put URLs here. Use an empty string if unknown.
-- tags: Return 3-4 short lowercase tags for meal type, dish type, cuisine when explicit, and main ingredients. Include dietary tags only when explicitly stated or unambiguously supported.
+- tags: Return 0-4 short lowercase descriptive tags. Do not feel obligated to return more than one tag. Use meal type, dish type, cuisine when explicit, or dietary tags only when explicitly stated or unambiguously supported. Never use an ingredient or ingredient name as a tag.
 - ingredients: Include every ingredient exactly once and preserve the source order. Keep preparation details such as "divided", "softened", or "finely chopped" in the name when they affect use. Remove brand names only when doing so does not change the ingredient.
 - ingredient quantity: Return only the amount as a string. Preserve ranges and mixed numbers. Prefer simple fractions such as "1/2" or "1 1/2". Use an empty string when absent.
 - ingredient unit: Use only one value from this exact list: ${JSON.stringify(UNIT_VALUES)}. Normalize obvious variants to that list. If no listed unit fits, leave unit empty and retain essential measurement wording in the ingredient name.
-- steps: Include every preparation and cooking instruction in source order. Each array item must be a complete, direct instruction. Preserve temperatures, durations, visual doneness cues, resting, cooling, and assembly instructions. Do not add step numbers to the text.
+- steps: Include every preparation and cooking instruction in source order. Each array item must be a complete, direct instruction. When a step refers to an ingredient, use the exact full `name` from the ingredients list, including any preparation details; do not shorten, paraphrase, or substitute the ingredient name. Preserve temperatures, durations, visual doneness cues, resting, cooling, and assembly instructions. Do not add step numbers to the text.
 - notes: Collect only source-provided tips, substitutions, storage guidance, make-ahead guidance, optional variations, and other useful information that is not an ingredient or required step. Combine multiple notes into readable plain text.
 - servingsVerb: Use "Serves" when the yield refers to people or servings. Use "Makes" for item counts, batches, volume, or other yields. Default to "Makes" when no yield is provided.
 - servingsQuantity: Return only the quantity or range, such as "4", "4-6", or "12". Use an empty string when absent.
@@ -176,7 +176,7 @@ const normalizeRecipe = (payload) => {
   const tags = arrayFrom(data.tags)
     .map((tag) => (typeof tag === "string" ? tag.trim() : ""))
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, 6);
 
   return {
     title: data.title?.trim() || "",
