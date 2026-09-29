@@ -252,9 +252,9 @@
                   <div v-if="event.type === 'edit'" class="space-y-1 text-sm text-base-dark">
                     <div v-for="(change, index) in event.changes" :key="`${event.id}-${index}`"
                       class="flex items-center gap-1">
-                      <PlusIcon v-if="change.type === 'added'" class="size-4 shrink-0 text-primary"
+                      <PlusIcon v-if="change.type === 'added'" class="size-4 shrink-0 mt-0.5"
                         aria-hidden="true" />
-                      <MinusIcon v-else-if="change.type === 'removed'" class="size-4 shrink-0 text-primary"
+                      <MinusIcon v-else-if="change.type === 'removed'" class="size-4 shrink-0 mt-0.5"
                         aria-hidden="true" />
                       <template v-else-if="change.type === 'changed'">
                         <span>{{ historyAmount(change.from) }} {{ change.ingredient }}</span>
@@ -346,7 +346,7 @@ const makeError = ref("");
 const editToRemove = ref(null);
 const editRemoving = ref(false);
 const editRemovalError = ref("");
-const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8]);
+const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 1.5, 2, 3, 4, 5, 6, 7, 8]);
 const multiplierIndex = ref(MULTIPLIERS.indexOf(1));
 const unitSystem = ref("customary");
 const unitSystemOptions = Object.freeze([
@@ -609,7 +609,12 @@ const FRACTIONS = Object.freeze({
   "1/5": "⅕", "2/5": "⅖", "3/5": "⅗", "4/5": "⅘", "1/6": "⅙",
   "5/6": "⅚", "1/7": "⅐", "1/8": "⅛", "3/8": "⅜", "5/8": "⅝", "7/8": "⅞",
 });
-const FRACTION_DENOMINATORS = [2, 3, 4, 5, 6, 7, 8];
+const FRACTION_DENOMINATORS = [2, 3, 4, 5, 6, 7, 8, 16];
+const SUPERSCRIPT_DIGITS = Object.freeze({ 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" });
+const SUBSCRIPT_DIGITS = Object.freeze({ 0: "₀", 1: "₁", 2: "₂", 3: "₃", 4: "₄", 5: "₅", 6: "₆", 7: "₇", 8: "₈", 9: "₉" });
+
+const formatComposedFraction = (numerator, denominator) =>
+  `${[...`${numerator}`].map((digit) => SUPERSCRIPT_DIGITS[digit]).join("")}⁄${[...`${denominator}`].map((digit) => SUBSCRIPT_DIGITS[digit]).join("")}`;
 
 const formatQuantity = (amount) => {
   if (!Number.isFinite(amount)) return "";
@@ -626,6 +631,8 @@ const formatQuantity = (amount) => {
   if (closest && closest.difference < 0.035) {
     const fraction = FRACTIONS[`${closest.numerator}/${closest.denominator}`];
     if (fraction) return whole ? `${whole}${fraction}` : fraction;
+    const textFraction = formatComposedFraction(closest.numerator, closest.denominator);
+    return whole ? `${whole} ${textFraction}` : textFraction;
   }
   if (Math.abs(remainder) < 0.000001) return `${whole}`;
   return `${Math.round(amount * 100) / 100}`;
@@ -636,10 +643,38 @@ const readableVolume = (amount) => {
   // for one to three gallons; above that, gallons are easier to scan.
   const targets = [
     ["gal", 3785.411784, 3], ["qt", 946.352946, 4],
-    ["cup", 236.5882365, 1 / 3], ["fl oz", 29.5735295625, 1],
-    ["tbsp", 14.78676478125, 1], ["tsp", 4.92892159375, 0],
+    ["cup", 236.5882365, 1 / 8], ["tbsp", 14.78676478125, 1 / 2],
+    ["tsp", 4.92892159375, 0],
   ];
   return targets.find(([, milliliters, minimum]) => amount / milliliters >= minimum) || targets.at(-1);
+};
+
+const CUSTOMARY_VOLUME_INCREMENTS = Object.freeze({
+  cup: [1 / 8, 1 / 6],
+  tbsp: [1 / 2],
+  tsp: [1 / 16, 1 / 6],
+});
+
+const roundToNearestMultiple = (amount, increments) => increments
+  .map((increment) => Math.round(amount / increment) * increment)
+  .reduce((closest, candidate) =>
+    Math.abs(amount - candidate) < Math.abs(amount - closest) ? candidate : closest,
+  );
+
+const formatCustomaryVolume = (amount, unit) => {
+  const increments = CUSTOMARY_VOLUME_INCREMENTS[unit];
+  const roundedAmount = increments ? roundToNearestMultiple(amount, increments) : amount;
+  return formatQuantity(roundedAmount);
+};
+
+const formatMetricQuantity = (amount, unit) => {
+  if (unit === "ml" || unit === "g") return formatMilliliters(amount);
+  if (unit === "l" || unit === "kg") {
+    const decimalPlaces = amount < 10 ? 3 : 2;
+    const precision = 10 ** decimalPlaces;
+    return `${Math.round(amount * precision) / precision}`;
+  }
+  return `${Math.round(amount * 100) / 100}`;
 };
 
 const readableCustomaryUnit = (amount, dimension) => {
@@ -678,7 +713,11 @@ const scaledIngredient = (ingredient) => {
     }
     const [unit, factor] = target;
     const convertedAmount = baseAmount / factor;
-    const quantity = unit === "ml" ? formatMilliliters(convertedAmount) : formatQuantity(convertedAmount);
+    const quantity = unitSystem.value === "metric"
+      ? formatMetricQuantity(convertedAmount, unit)
+      : unitSystem.value === "customary" && definition.dimension === "volume"
+        ? formatCustomaryVolume(convertedAmount, unit)
+        : formatQuantity(convertedAmount);
     return { quantity, unit: formatUnit(unit, quantity) };
   }
   const quantity = formatQuantity(scaledAmount);
