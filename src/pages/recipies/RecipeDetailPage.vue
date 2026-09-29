@@ -59,6 +59,12 @@
                       aria-label="Allow anyone with the link to view this recipe"
                       @update:model-value="setPublicShare" />
                   </div>
+                  <div class="mt-3 flex items-center justify-between gap-4">
+                    <span class="font-semibold text-base-dark">Share recipe history</span>
+                    <BaseToggle :model-value="shareHistoryEnabled" :disabled="shareSaving"
+                      aria-label="Allow recipe-only viewers to see the recipe history"
+                      @update:model-value="setShareHistory" />
+                  </div>
                   <template v-if="publicShareEnabled && shareLink">
                     <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-share-link">Share
                       link</label>
@@ -200,7 +206,7 @@
 
         <div class="md:w-1/4 md:mt-18">
 
-          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div v-if="canViewPairings" class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
               <div class="font-bold text-base-dark text-xl">
                 Parings
@@ -232,7 +238,7 @@
             </ul>
           </div>
 
-          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div v-if="canViewHistory" class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
               <div class="font-bold text-base-dark text-xl">
                 History
@@ -380,6 +386,10 @@ const canManageShare = computed(() =>
   !isShareRoute.value && recipe.value?.ownerId === auth.state.user?.id,
 );
 const publicShareEnabled = computed(() => Boolean(publicShareToken.value));
+const shareHistoryEnabled = computed(() => Boolean(recipe.value?.shareHistory));
+const canAccessCookbook = computed(() => !isShareRoute.value || Boolean(sharedRecipe.value?.permissions?.hasCookbookAccess));
+const canViewPairings = computed(() => canAccessCookbook.value);
+const canViewHistory = computed(() => canAccessCookbook.value || shareHistoryEnabled.value);
 const shareLink = computed(() => {
   if (!publicShareToken.value) return "";
   return `${window.location.origin}/share/${publicShareToken.value}`;
@@ -705,6 +715,27 @@ const formatCustomaryVolume = (amount, unit) => {
   return formatQuantity(roundedAmount);
 };
 
+const setShareHistory = async (enabled) => {
+  if (!recipe.value?.id || shareSaving.value) return;
+  shareSaving.value = true;
+  shareSettingsError.value = "";
+  try {
+    const res = await fetch(`/api/recipes/${recipe.value.id}/share/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ enabled }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data?.error || "Unable to update sharing settings.");
+    recipe.value.shareHistory = Boolean(data.shareHistory);
+  } catch (error) {
+    shareSettingsError.value = error.message || "Unable to update sharing settings.";
+  } finally {
+    shareSaving.value = false;
+  }
+};
+
 const formatMetricQuantity = (amount, unit) => {
   if (unit === "ml" || unit === "g") return formatMilliliters(amount);
   if (unit === "l" || unit === "kg") {
@@ -841,7 +872,7 @@ const loadSharedRecipe = async () => {
     }
     if (!res.ok || !data.success)
       throw new Error(data?.error || "Unable to load shared recipe.");
-    sharedRecipe.value = data.recipe;
+    sharedRecipe.value = { ...data.recipe, permissions: data.permissions || {} };
   } catch (error) {
     shareError.value = error.message || "Unable to load shared recipe.";
   } finally {

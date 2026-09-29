@@ -86,6 +86,7 @@ db.exec(`
     servingsQuantity TEXT DEFAULT '',
     servingsUnit TEXT DEFAULT '',
     history TEXT DEFAULT '[]',
+    shareHistory INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (ownerId) REFERENCES users(id),
     FOREIGN KEY (cookbookId) REFERENCES cookbooks(id) ON DELETE SET NULL
   );
@@ -256,6 +257,9 @@ const recipeColumnsWithHistory = db.prepare("PRAGMA table_info('recipes')").all(
 if (!recipeColumnsWithHistory.some((col) => col.name === "history")) {
   db.exec("ALTER TABLE recipes ADD COLUMN history TEXT DEFAULT '[]';");
 }
+if (!recipeColumnsWithHistory.some((col) => col.name === "shareHistory")) {
+  db.exec("ALTER TABLE recipes ADD COLUMN shareHistory INTEGER NOT NULL DEFAULT 0;");
+}
 try {
   const recipeColumnsPost = db.prepare("PRAGMA table_info('recipes')").all();
   const hasCookbookIdNow = recipeColumnsPost.some((col) => col.name === "cookbookId");
@@ -351,6 +355,7 @@ const rowToRecipe = (row) => ({
     const history = parseJson(row.history, []);
     return history.length ? history : [{ id: `created-${row.id}`, type: "created", createdAt: row.createdAt }];
   })(),
+  shareHistory: Boolean(row.shareHistory),
 });
 
 const rowToRecipeSummary = (row) => ({
@@ -392,6 +397,7 @@ const serializeRecipe = (recipe) => ({
   servingsQuantity: recipe.servingsQuantity ?? "",
   servingsUnit: recipe.servingsUnit ?? "",
   history: JSON.stringify(recipe.history ?? []),
+  shareHistory: recipe.shareHistory ? 1 : 0,
 });
 
 const rowToCookbook = (row) => ({
@@ -432,8 +438,8 @@ export const getRecipeById = (id, ownerId) => {
 
 export const saveRecipe = (recipe) => {
   const upsertStmt = db.prepare(`
-    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, ingredientPreview, steps, ownerId, isPublic, notes, servingsVerb, servingsQuantity, servingsUnit, history, cookbookId)
-    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @ingredientPreview, @steps, @ownerId, @isPublic, @notes, @servingsVerb, @servingsQuantity, @servingsUnit, @history, @cookbookId)
+    INSERT INTO recipes (id, title, description, author, createdAt, tags, ingredients, ingredientPreview, steps, ownerId, isPublic, notes, servingsVerb, servingsQuantity, servingsUnit, history, shareHistory, cookbookId)
+    VALUES (@id, @title, @description, @author, @createdAt, @tags, @ingredients, @ingredientPreview, @steps, @ownerId, @isPublic, @notes, @servingsVerb, @servingsQuantity, @servingsUnit, @history, @shareHistory, @cookbookId)
     ON CONFLICT(id) DO UPDATE SET
       title=excluded.title,
       description=excluded.description,
@@ -450,6 +456,7 @@ export const saveRecipe = (recipe) => {
       servingsQuantity=excluded.servingsQuantity,
       servingsUnit=excluded.servingsUnit,
       history=excluded.history,
+      shareHistory=excluded.shareHistory,
       cookbookId=excluded.cookbookId
   `);
   upsertStmt.run(serializeRecipe(recipe));
@@ -1129,6 +1136,9 @@ export const listCookbookMembers = (cookbookId) => {
 
 export const listCookbookMemberIds = (cookbookId) =>
   listCookbookMembers(cookbookId).map(({ userId }) => userId);
+
+export const hasCookbookAccess = (cookbookId, userId) =>
+  Boolean(userId) && listCookbookMemberIds(cookbookId).includes(userId);
 
 export const isCookbookEditor = (cookbookId, userId) => {
   const cookbook = getCookbookById(cookbookId);

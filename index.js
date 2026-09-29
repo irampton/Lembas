@@ -105,6 +105,7 @@ const normalizeRecipe = (incoming) => {
     servingsQuantity: servingQuantity,
     servingsUnit: servingUnit,
     history: Array.isArray(incoming.history) ? incoming.history : [],
+    shareHistory: Boolean(incoming.shareHistory),
   };
 };
 
@@ -875,10 +876,14 @@ app.get("/api/share/:token", async (req, res) => {
       return;
     }
   }
-  const isOwner = req.user && req.user.id === recipe.ownerId;
+  const hasCookbookAccess = db.hasCookbookAccess(recipe.cookbookId, req.user?.id);
   const responseRecipe = { ...recipe, isPublic: share.type === "public" || recipe.isPublic };
-  if (!isOwner) {
+  if (hasCookbookAccess) {
+    responseRecipe.pairings = db.getRecipePairingsForUser(recipe.id, req.user.id);
+  } else {
     responseRecipe.cookbookId = "";
+    responseRecipe.pairings = [];
+    if (!recipe.shareHistory) responseRecipe.history = [];
   }
   res.json({
     success: true,
@@ -888,6 +893,7 @@ app.get("/api/share/:token", async (req, res) => {
         (req.user && req.user.id === recipe.ownerId) ||
         (Boolean(share.canEdit) && (!share.userId || (req.user && req.user.id === share.userId))),
       type: share.type,
+      hasCookbookAccess,
     },
   });
 });
@@ -1057,6 +1063,7 @@ io.on("connection", (socket) => {
       normalized.author = user.username || "";
     }
     normalized.history = historyForSave(existing, normalized);
+    normalized.shareHistory = existing?.shareHistory ?? normalized.shareHistory;
     const saved = db.saveRecipe(normalized);
 
     // Acknowledge the write before generating full library payloads for every
@@ -1210,6 +1217,17 @@ io.on("connection", (socket) => {
       });
     });
   });
+});
+
+app.post("/api/recipes/:id/share/history", auth.requireAuth, (req, res) => {
+  const { id } = req.params;
+  const recipe = db.getRecipeById(id, req.user.id);
+  if (!recipe) {
+    res.status(404).json({ success: false, error: "Recipe not found." });
+    return;
+  }
+  const saved = db.saveRecipe({ ...recipe, shareHistory: Boolean(req.body?.enabled) });
+  res.json({ success: true, shareHistory: saved.shareHistory });
 });
 
 app.get("/{*splat}", (req, res) => {
