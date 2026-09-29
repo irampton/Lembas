@@ -53,9 +53,11 @@
       <p v-if="!tags.length" class="text-sm text-light">No tags available.</p>
     </div>
     <p v-if="store.state.error" role="alert" class="mb-3 text-red-700">{{ store.state.error }} <button type="button" class="underline" @click="store.loadLibrary()">Retry</button></p>
-    <p v-if="store.state.loading && !store.state.ready" class="text-center text-light italic" role="status">
-      Loading recipes…
-    </p>
+    <div v-if="store.state.loading && !store.state.ready"
+      class="flex flex-col items-center gap-3 text-center text-light italic" role="status">
+      <BaseLoadingSpinner />
+      <p>Loading recipes…</p>
+    </div>
     <ul v-else-if="recipes.length">
       <li v-for="recipe in recipes" :key="recipe.id" class="my-2">
         <RecipeCard :recipe-id="recipe.id" :recipe-name="recipe.title" :ingredient-preview="recipe.ingredientPreview" :tags="recipe.tags" :cookbook="cookbookById.get(recipe.cookbookId)" />
@@ -72,6 +74,7 @@ import { RouterLink } from 'vue-router';
 import { BookOpenIcon, TagIcon } from '@heroicons/vue/24/outline';
 import { BookOpenIcon as BookOpenSolidIcon, TagIcon as TagSolidIcon } from '@heroicons/vue/24/solid';
 import BaseDropdown from '../../baseComponents/BaseDropdown.vue';
+import BaseLoadingSpinner from '../../baseComponents/BaseLoadingSpinner.vue';
 import { useRecipeStore } from '../../stores/recipeStore.js';
 import RecipeCard from './RecipeCard.vue';
 const store = useRecipeStore();

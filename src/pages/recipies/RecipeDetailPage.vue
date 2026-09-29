@@ -1,7 +1,9 @@
 <template>
   <div class="p-4 lg:px-[15%]">
-    <div v-if="!isShareRoute && ((store.state.loading && !store.state.ready) || detailLoading)">
-      Loading recipe…
+    <div v-if="!isShareRoute && ((store.state.loading && !store.state.ready) || detailLoading)"
+      class="flex flex-col items-center gap-3 text-center text-light italic" role="status">
+      <BaseLoadingSpinner />
+      <p>Loading recipe…</p>
     </div>
 
     <div v-else-if="isShareRoute && shareLoading">
@@ -328,6 +330,7 @@ import BaseTag from "../../baseComponents/BaseTag.vue";
 import BaseSplitButton from "../../baseComponents/BaseSplitButton.vue";
 import BaseToggle from "../../baseComponents/BaseToggle.vue";
 import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
+import BaseLoadingSpinner from "../../baseComponents/BaseLoadingSpinner.vue";
 import RecipeIngredientHover from "../../shared/RecipeIngredientHover.vue";
 import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
