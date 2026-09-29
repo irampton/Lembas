@@ -211,6 +211,42 @@ const removeRecipePairing = (recipeId, pairedRecipeId) =>
     });
   });
 
+const saveRecipeMake = ({ recipeId, id, notes }) =>
+  new Promise((resolve, reject) => {
+    socket.emit('recipe:make:save', { recipeId, id, notes }, (response) => {
+      if (response?.success) {
+        applyRecipe(response.data);
+        resolve(response.data);
+      } else {
+        reject(new Error(response?.error || 'Unable to save recipe make.'));
+      }
+    });
+  });
+
+const deleteRecipeMake = (recipeId, eventId) =>
+  new Promise((resolve, reject) => {
+    socket.emit('recipe:make:delete', { recipeId, eventId }, (response) => {
+      if (response?.success) {
+        applyRecipe(response.data);
+        resolve(response.data);
+      } else {
+        reject(new Error(response?.error || 'Unable to delete recipe make.'));
+      }
+    });
+  });
+
+const deleteRecipeHistoryEdit = (recipeId, eventId) =>
+  new Promise((resolve, reject) => {
+    socket.emit('recipe:history:edit:delete', { recipeId, eventId }, (response) => {
+      if (response?.success) {
+        applyRecipe(response.data);
+        resolve(response.data);
+      } else {
+        reject(new Error(response?.error || 'Unable to delete recipe edit.'));
+      }
+    });
+  });
+
 const saveCookbook = async (cookbook) => {
   const isEditing = Boolean(cookbook.id);
   const res = await fetch(isEditing ? `/api/cookbooks/${cookbook.id}` : '/api/cookbooks', {
@@ -284,6 +320,9 @@ export const useRecipeStore = () => ({
   deleteRecipe,
   addRecipePairing,
   removeRecipePairing,
+  saveRecipeMake,
+  deleteRecipeMake,
+  deleteRecipeHistoryEdit,
   saveCookbook,
   reorderCookbooks,
   deleteCookbook,

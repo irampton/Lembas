@@ -183,6 +183,7 @@
         </div>
 
         <div class="md:w-1/4 md:mt-18">
+
           <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
               <div class="font-bold text-base-dark text-xl">
@@ -214,6 +215,53 @@
               </li>
             </ul>
           </div>
+
+          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+            <div class="flex flex-row justify-between items-center">
+              <div class="font-bold text-base-dark text-xl">
+                History
+              </div>
+              <button v-if="canEditRecipe" type="button" class="rounded-lg p-1 text-accent hover:bg-base"
+                aria-label="Add a recipe make" @click="openMakePopup()">
+                <PlusIcon class="size-6" />
+              </button>
+            </div>
+            <ol v-if="historyEvents.length" class="relative mt-4 ml-2 border-l-2 border-primary-alt">
+              <li v-for="event in historyEvents" :key="event.id" class="relative pb-5 pl-5 last:pb-0 cursor-pointer"
+                :title="historyTimestamp(event.createdAt)" @click="event.type === 'edit' && openEditRemoval(event)">
+                <ChatBubbleBottomCenterTextIcon v-if="event.type === 'make'"
+                  class="absolute -left-2.5 top-0 size-5 bg-base-alt text-primary" />
+                <CheckCircleIcon v-else-if="event.type === 'created'"
+                  class="absolute -left-2.5 top-0 size-5 bg-base-alt text-primary" />
+                <PencilIcon v-else class="absolute -left-2.5 top-0 size-5 bg-base-alt text-primary" />
+                <template v-if="event.type === 'make'">
+                  <div @click="canEditRecipe ? openMakePopup(event) : undefined">
+                    <div class="whitespace-pre-wrap text-base-dark">{{ event.notes || 'Made' }}</div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div v-if="event.type === 'created'" class="text-sm text-base-dark">Recipe created</div>
+                  <div v-if="event.type === 'edit'" class="space-y-1 text-sm text-base-dark">
+                    <div v-for="(change, index) in event.changes" :key="`${event.id}-${index}`"
+                      class="flex items-center gap-1">
+                      <PlusIcon v-if="change.type === 'added'" class="size-4 shrink-0 text-primary"
+                        aria-hidden="true" />
+                      <MinusIcon v-else-if="change.type === 'removed'" class="size-4 shrink-0 text-primary"
+                        aria-hidden="true" />
+                      <template v-else-if="change.type === 'changed'">
+                        <span>{{ historyAmount(change.from) }} {{ change.ingredient }}</span>
+                        <ArrowRightIcon class="size-4 shrink-0 text-primary" aria-hidden="true" />
+                        <span>{{ historyAmount(change.to) }}</span>
+                      </template>
+                      <span v-if="change.type === 'added' || change.type === 'removed'">{{ change.ingredient }}</span>
+                      <span v-if="!change.type">{{ change }}</span>
+                    </div>
+                  </div>
+                </template>
+              </li>
+            </ol>
+          </div>
+
         </div>
 
       </div>
@@ -225,19 +273,36 @@
       <p class="mt-2">Remove <strong>{{ pairingToRemove.title }}</strong> from this recipe's pairings?</p>
       <p v-if="pairingRemovalError" class="mt-3 text-sm text-error" role="alert">{{ pairingRemovalError }}</p>
     </BasePopup>
+    <BasePopup v-if="makePopupOpen" aria-label="Recipe make"
+      :buttons="editingMake ? ['cancel', 'delete', 'confirm'] : ['cancel', 'confirm']" :confirm-disabled="makeSaving"
+      :delete-disabled="makeSaving" @close="closeMakePopup" @confirm="saveMake" @delete="deleteMake">
+      <h2 class="text-2xl font-bold text-base-dark">{{ editingMake ? 'Edit make' : 'Add make' }}</h2>
+      <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-make-notes">Notes</label>
+      <BaseTextArea id="recipe-make-notes" v-model="makeNotes" class="mt-1" rows="4"
+        placeholder="Add notes about this make" :disabled="makeSaving" />
+      <p v-if="editingMake" class="mt-3 text-sm text-light">Deleting this make cannot be undone.</p>
+      <p v-if="makeError" class="mt-3 text-sm text-error" role="alert">{{ makeError }}</p>
+    </BasePopup>
+    <BasePopup v-if="editToRemove" aria-label="Delete recipe edit" :buttons="['cancel', 'delete']"
+      :delete-disabled="editRemoving" @close="closeEditRemoval" @delete="removeEdit">
+      <h2 class="text-2xl font-bold text-base-dark">Delete edit?</h2>
+      <p class="mt-2">This will permanently remove this recipe edit from the history and cannot be undone.</p>
+      <p v-if="editRemovalError" class="mt-3 text-sm text-error" role="alert">{{ editRemovalError }}</p>
+    </BasePopup>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import { PencilIcon, ArrowUpOnSquareIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { ArrowRightIcon, ArrowUpOnSquareIcon, ChatBubbleBottomCenterTextIcon, CheckCircleIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, MinusIcon, PencilIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import BaseFloatingBox from "../../baseComponents/BaseFloatingBox.vue";
 import BaseAutocomplete from "../../baseComponents/BaseAutocomplete.vue";
 import BasePopup from "../../baseComponents/BasePopup.vue";
 import BaseTag from "../../baseComponents/BaseTag.vue";
 import BaseSplitButton from "../../baseComponents/BaseSplitButton.vue";
 import BaseToggle from "../../baseComponents/BaseToggle.vue";
+import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
 import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
 import { formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
@@ -264,6 +329,14 @@ const pairingError = ref("");
 const pairingToRemove = ref(null);
 const pairingRemoving = ref(false);
 const pairingRemovalError = ref("");
+const makePopupOpen = ref(false);
+const editingMake = ref(null);
+const makeNotes = ref("");
+const makeSaving = ref(false);
+const makeError = ref("");
+const editToRemove = ref(null);
+const editRemoving = ref(false);
+const editRemovalError = ref("");
 const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8]);
 const multiplierIndex = ref(MULTIPLIERS.indexOf(1));
 const unitSystem = ref("customary");
@@ -309,6 +382,8 @@ const pairingOptions = computed(() => {
     .filter((candidate) => candidate.id !== recipe.value?.id && !pairedIds.has(candidate.id))
     .map((candidate) => ({ value: candidate.id, label: candidate.title }));
 });
+const historyEvents = computed(() => [...(recipe.value?.history || [])]
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 const stepNumberStyle = computed(() => {
   const color = recipeCookbook.value?.color;
   return color ? { borderColor: color, color } : {};
@@ -403,6 +478,83 @@ const removePairing = async () => {
     pairingRemovalError.value = error.message || "Unable to remove recipe pairing.";
   } finally {
     pairingRemoving.value = false;
+  }
+};
+
+const openMakePopup = (event = null) => {
+  editingMake.value = event;
+  makeNotes.value = event?.notes || "";
+  makeError.value = "";
+  makePopupOpen.value = true;
+};
+
+const closeMakePopup = () => {
+  if (makeSaving.value) return;
+  makePopupOpen.value = false;
+  editingMake.value = null;
+  makeNotes.value = "";
+  makeError.value = "";
+};
+
+const saveMake = async () => {
+  if (!recipe.value?.id || makeSaving.value) return;
+  makeSaving.value = true;
+  makeError.value = "";
+  try {
+    await store.saveRecipeMake({
+      recipeId: recipe.value.id,
+      id: editingMake.value?.id,
+      notes: makeNotes.value,
+    });
+    makePopupOpen.value = false;
+    editingMake.value = null;
+    makeNotes.value = "";
+  } catch (error) {
+    makeError.value = error.message || "Unable to save recipe make.";
+  } finally {
+    makeSaving.value = false;
+  }
+};
+
+const deleteMake = async () => {
+  if (!recipe.value?.id || !editingMake.value?.id || makeSaving.value) return;
+  makeSaving.value = true;
+  makeError.value = "";
+  try {
+    await store.deleteRecipeMake(recipe.value.id, editingMake.value.id);
+    makePopupOpen.value = false;
+    editingMake.value = null;
+    makeNotes.value = "";
+  } catch (error) {
+    makeError.value = error.message || "Unable to delete recipe make.";
+  } finally {
+    makeSaving.value = false;
+  }
+};
+
+const openEditRemoval = (event) => {
+  if (!canEditRecipe.value || event?.type !== "edit") return;
+  editToRemove.value = event;
+  editRemovalError.value = "";
+};
+
+const closeEditRemoval = () => {
+  if (editRemoving.value) return;
+  editToRemove.value = null;
+  editRemovalError.value = "";
+};
+
+const removeEdit = async () => {
+  if (!recipe.value?.id || !editToRemove.value || editRemoving.value) return;
+  editRemoving.value = true;
+  editRemovalError.value = "";
+  try {
+    await store.deleteRecipeHistoryEdit(recipe.value.id, editToRemove.value.id);
+    editToRemove.value = null;
+  } catch (error) {
+    editRemovalError.value = error.message || "Unable to delete recipe edit.";
+  } finally {
+    editRemoving.value = false;
   }
 };
 
@@ -533,6 +685,23 @@ const formattedDate = computed(() => {
   });
 });
 
+const historyTimestamp = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const historyAmount = ({ quantity, unit } = {}) => {
+  const abbreviation = getUnit(unit)?.abbreviation || unit || "";
+  return [quantity, abbreviation].filter(Boolean).join(" ");
+};
+
 const ingredientQuantity = (ingredient) => {
   return [ingredient.quantity, formatUnit(ingredient.unit, ingredient.quantity)]
     .filter(Boolean)
@@ -592,6 +761,8 @@ watch(
     pairingQuery.value = "";
     pairingError.value = "";
     pairingToRemove.value = null;
+    closeMakePopup();
+    closeEditRemoval();
     loadRecipe();
   },
   { immediate: true },

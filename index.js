@@ -104,7 +104,55 @@ const normalizeRecipe = (incoming) => {
     servingsVerb: incoming.servingsVerb === "Serves" ? "Serves" : "Makes",
     servingsQuantity: servingQuantity,
     servingsUnit: servingUnit,
+    history: Array.isArray(incoming.history) ? incoming.history : [],
   };
+};
+
+const ingredientText = (ingredient) => [
+  formatQuantity(ingredient?.quantity ?? ingredient?.quantityRaw ?? ""),
+  ingredient?.unit,
+  ingredient?.name,
+].filter(Boolean).join(" ");
+
+const ingredientQuantityText = (ingredient) => [
+  formatQuantity(ingredient?.quantity ?? ingredient?.quantityRaw ?? ""),
+  ingredient?.unit,
+].filter(Boolean).join(" ");
+
+const ingredientChanges = (before = [], after = []) => {
+  const remainingBefore = new Map(before.map((ingredient, index) => [ingredient.id || `before-${index}`, ingredient]));
+  const changes = [];
+  after.forEach((ingredient, index) => {
+    const key = ingredient.id || `after-${index}`;
+    const previous = remainingBefore.get(key);
+    if (!previous) {
+      changes.push({ type: "added", ingredient: ingredientText(ingredient) });
+      return;
+    }
+    remainingBefore.delete(key);
+    const oldQuantity = ingredientQuantityText(previous);
+    const newQuantity = ingredientQuantityText(ingredient);
+    if (oldQuantity !== newQuantity) {
+      changes.push({
+        type: "changed",
+        ingredient: ingredient.name,
+        from: { quantity: previous.quantity ?? previous.quantityRaw ?? "", unit: previous.unit || "" },
+        to: { quantity: ingredient.quantity ?? ingredient.quantityRaw ?? "", unit: ingredient.unit || "" },
+      });
+    }
+  });
+  remainingBefore.forEach((ingredient) => changes.push({ type: "removed", ingredient: ingredientText(ingredient) }));
+  return changes;
+};
+
+const historyForSave = (existing, normalized) => {
+  if (!existing) {
+    return [{ id: crypto.randomUUID(), type: "created", createdAt: new Date().toISOString() }];
+  }
+  const changes = ingredientChanges(existing.ingredients, normalized.ingredients);
+  return changes.length
+    ? [{ id: crypto.randomUUID(), type: "edit", createdAt: new Date().toISOString(), changes }, ...(existing.history || [])]
+    : (existing.history || []);
 };
 
 const getLlmSettings = () => {
@@ -880,6 +928,7 @@ app.put("/api/share/:token", async (req, res) => {
     cookbookId: recipe.cookbookId,
     isPublic: recipe.isPublic,
   });
+  normalized.history = historyForSave(recipe, normalized);
   const saved = db.saveRecipe(normalized);
   res.json({ success: true, recipe: saved });
 });
@@ -1007,6 +1056,7 @@ io.on("connection", (socket) => {
     if (!normalized.author) {
       normalized.author = user.username || "";
     }
+    normalized.history = historyForSave(existing, normalized);
     const saved = db.saveRecipe(normalized);
 
     // Acknowledge the write before generating full library payloads for every
@@ -1027,6 +1077,55 @@ io.on("connection", (socket) => {
       return;
     }
     reply({ success: true, data: recipe });
+  });
+
+  socket.on("recipe:make:save", ({ recipeId, id, notes } = {}, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const recipe = db.getRecipeForUser(recipeId, user.id);
+    if (!recipe) return reply({ success: false, error: "Recipe not found." });
+    if (!db.isCookbookEditor(recipe.cookbookId, user.id)) {
+      return reply({ success: false, error: "You do not have permission to add makes to this recipe." });
+    }
+    const now = new Date().toISOString();
+    const event = id ? recipe.history?.find((item) => item.id === id && item.type === "make") : null;
+    if (id && !event) return reply({ success: false, error: "Make not found." });
+    const nextEvent = event
+      ? { ...event, notes: (notes || "").trim(), updatedAt: now }
+      : { id: crypto.randomUUID(), type: "make", createdAt: now, notes: (notes || "").trim() };
+    const history = event
+      ? recipe.history.map((item) => item.id === id ? nextEvent : item)
+      : [nextEvent, ...(recipe.history || [])];
+    const saved = db.saveRecipe({ ...recipe, history });
+    reply({ success: true, data: saved });
+    setImmediate(() => emitRecipeUpdate(saved));
+  });
+
+  socket.on("recipe:make:delete", ({ recipeId, eventId } = {}, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const recipe = db.getRecipeForUser(recipeId, user.id);
+    if (!recipe) return reply({ success: false, error: "Recipe not found." });
+    if (!db.isCookbookEditor(recipe.cookbookId, user.id)) {
+      return reply({ success: false, error: "You do not have permission to delete recipe makes." });
+    }
+    const event = recipe.history?.find((item) => item.id === eventId && item.type === "make");
+    if (!event) return reply({ success: false, error: "Recipe make not found." });
+    const saved = db.saveRecipe({ ...recipe, history: recipe.history.filter((item) => item.id !== eventId) });
+    reply({ success: true, data: saved });
+    setImmediate(() => emitRecipeUpdate(saved));
+  });
+
+  socket.on("recipe:history:edit:delete", ({ recipeId, eventId } = {}, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const recipe = db.getRecipeForUser(recipeId, user.id);
+    if (!recipe) return reply({ success: false, error: "Recipe not found." });
+    if (!db.isCookbookEditor(recipe.cookbookId, user.id)) {
+      return reply({ success: false, error: "You do not have permission to delete recipe edits." });
+    }
+    const event = recipe.history?.find((item) => item.id === eventId && item.type === "edit");
+    if (!event) return reply({ success: false, error: "Recipe edit not found." });
+    const saved = db.saveRecipe({ ...recipe, history: recipe.history.filter((item) => item.id !== eventId) });
+    reply({ success: true, data: saved });
+    setImmediate(() => emitRecipeUpdate(saved));
   });
 
   socket.on("recipe:delete", (id, ack) => {
