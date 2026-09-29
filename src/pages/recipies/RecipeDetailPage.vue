@@ -19,87 +19,85 @@
 
     <div v-else>
 
-      <div class="flex flex-col md:flex-row">
-        <div>
-
+      <div v-if="!isShareRoute && recipeCookbook"
+        class="mr-1 max-w-48 w-min truncate rounded-full px-3 py-1 text-sm font-bold md:hidden"
+        :style="cookbookPillStyle" :title="recipeCookbook.name">
+        {{ recipeCookbook.name }}
+      </div>
+      <div class="flex flex-row justify-between md:mx-5">
+        <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
+        <div class="flex flex-row items-center text-right md:mt-1 text-accent">
           <div v-if="!isShareRoute && recipeCookbook"
-            class="mr-1 max-w-48 w-min truncate rounded-full px-3 py-1 text-sm font-bold md:hidden"
+            class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold hidden md:block"
             :style="cookbookPillStyle" :title="recipeCookbook.name">
             {{ recipeCookbook.name }}
           </div>
-          <div class="flex flex-row justify-between md:mx-5">
-            <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
-            <div class="flex flex-row items-center text-right md:mt-1 text-accent">
-              <div v-if="!isShareRoute && recipeCookbook"
-                class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold hidden md:block"
-                :style="cookbookPillStyle" :title="recipeCookbook.name">
-                {{ recipeCookbook.name }}
-              </div>
-              <button v-if="isShareRoute && auth.state.user" type="button"
-                class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-alt"
-                @click="addToMyRecipes">
-                Add to my recipes
-              </button>
-              <div v-if="!isShareRoute" class="rounded-xl p-1 hover:bg-base-alt">
-                <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
-                  aria-label="Edit recipe">
-                  <PencilIcon class="size-8" />
-                </RouterLink>
-              </div>
-              <div v-if="canManageShare" class="relative">
-                <button type="button" class="rounded-xl p-1 hover:bg-base-alt" aria-label="Share recipe"
-                  :aria-expanded="shareMenuOpen" @click.stop="toggleShareMenu">
-                  <ArrowUpOnSquareIcon class="size-8" />
-                </button>
-                <BaseFloatingBox v-if="shareMenuOpen" class="absolute right-0 top-full z-10 mt-2 w-80 text-left"
-                  @clickaway="shareMenuOpen = false">
-                  <div class="flex items-center justify-between gap-4">
-                    <span class="font-semibold text-base-dark">Anyone can view</span>
-                    <BaseToggle :model-value="publicShareEnabled" :disabled="shareSaving"
-                      aria-label="Allow anyone with the link to view this recipe"
-                      @update:model-value="setPublicShare" />
-                  </div>
-                  <div class="mt-3 flex items-center justify-between gap-4">
-                    <span class="font-semibold text-base-dark">Share recipe history</span>
-                    <BaseToggle :model-value="shareHistoryEnabled" :disabled="shareSaving"
-                      aria-label="Allow recipe-only viewers to see the recipe history"
-                      @update:model-value="setShareHistory" />
-                  </div>
-                  <template v-if="publicShareEnabled && shareLink">
-                    <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-share-link">Share
-                      link</label>
-                    <div class="mt-1 flex gap-2">
-                      <input id="recipe-share-link" :value="shareLink" readonly
-                        class="min-w-0 grow rounded-lg border border-primary-alt bg-base-alt px-2 py-1 text-sm text-base-dark" />
-                      <button type="button"
-                        class="rounded-lg bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-alt"
-                        @click="copyShareLink">
-                        {{ linkCopied ? 'Copied' : 'Copy' }}
-                      </button>
-                    </div>
-                  </template>
-                  <p v-if="shareSettingsError" class="mt-3 text-sm text-error" role="alert">{{ shareSettingsError }}</p>
-                </BaseFloatingBox>
-              </div>
-            </div>
+          <button v-if="isShareRoute && auth.state.user" type="button"
+            class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-alt"
+            @click="addToMyRecipes">
+            Add to my recipes
+          </button>
+          <div v-if="!isShareRoute" class="rounded-xl p-1 hover:bg-base-alt">
+            <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
+              aria-label="Edit recipe">
+              <PencilIcon class="size-8" />
+            </RouterLink>
           </div>
-          <div class="flex flex-col md:flex-row md:items-center">
-            <div class="text-light pb-1 pl-px pt-px md:ml-5 shrink-0 place-self-start">
-              <span v-if="recipe.author">{{ recipe.author }}</span>
-              <span v-if="recipe.author && formattedDate"> • </span>
-              <span v-if="formattedDate">{{ formattedDate }}</span>
-              <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
-              <span v-if="servingSize">{{ servingSize }}</span>
-            </div>
-            <div v-if="hasTags" class="py-1 md:py-0 md:ml-4">
-              <div class="flex flex-row flex-wrap gap-2">
-                <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
-                  {{ tag }}
-                </BaseTag>
+          <div v-if="canManageShare" class="relative">
+            <button type="button" class="rounded-xl p-1 hover:bg-base-alt" aria-label="Share recipe"
+              :aria-expanded="shareMenuOpen" @click.stop="toggleShareMenu">
+              <ArrowUpOnSquareIcon class="size-8" />
+            </button>
+            <BaseFloatingBox v-if="shareMenuOpen" class="absolute right-0 top-full z-10 mt-2 w-80 text-left"
+              @clickaway="shareMenuOpen = false">
+              <div class="flex items-center justify-between gap-4">
+                <span class="font-semibold text-base-dark">Anyone can view</span>
+                <BaseToggle :model-value="publicShareEnabled" :disabled="shareSaving"
+                  aria-label="Allow anyone with the link to view this recipe" @update:model-value="setPublicShare" />
               </div>
-            </div>
+              <div class="mt-3 flex items-center justify-between gap-4">
+                <span class="font-semibold text-base-dark">Share recipe history</span>
+                <BaseToggle :model-value="shareHistoryEnabled" :disabled="shareSaving"
+                  aria-label="Allow recipe-only viewers to see the recipe history"
+                  @update:model-value="setShareHistory" />
+              </div>
+              <template v-if="publicShareEnabled && shareLink">
+                <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-share-link">Share
+                  link</label>
+                <div class="mt-1 flex gap-2">
+                  <input id="recipe-share-link" :value="shareLink" readonly
+                    class="min-w-0 grow rounded-lg border border-primary-alt bg-base-alt px-2 py-1 text-sm text-base-dark" />
+                  <button type="button"
+                    class="rounded-lg bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-alt"
+                    @click="copyShareLink">
+                    {{ linkCopied ? 'Copied' : 'Copy' }}
+                  </button>
+                </div>
+              </template>
+              <p v-if="shareSettingsError" class="mt-3 text-sm text-error" role="alert">{{ shareSettingsError }}</p>
+            </BaseFloatingBox>
           </div>
+        </div>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-center">
+        <div class="text-light pb-1 pl-px pt-px md:ml-5 shrink-0 place-self-start">
+          <span v-if="recipe.author">{{ recipe.author }}</span>
+          <span v-if="recipe.author && formattedDate"> • </span>
+          <span v-if="formattedDate">{{ formattedDate }}</span>
+          <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
+          <span v-if="servingSize">{{ servingSize }}</span>
+        </div>
+        <div v-if="hasTags" class="py-1 md:py-0 md:ml-4">
+          <div class="flex flex-row flex-wrap gap-2">
+            <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
+              {{ tag }}
+            </BaseTag>
+          </div>
+        </div>
+      </div>
 
+      <div class="flex flex-col md:flex-row">
+        <div>
 
           <div class="flex flex-col md:flex-row">
             <div class="md:w-fit md:pr-2">
@@ -114,19 +112,18 @@
                       <ChevronDoubleLeftIcon class="size-5" />
                     </button>
                     <span class="min-w-10 text-center font-bold text-base-dark" aria-live="polite">
-                      <input v-if="editingMultiplier" ref="multiplierInputElement" v-model="multiplierInput"
-                        type="text" inputmode="decimal" aria-label="Custom recipe quantity multiplier"
+                      <input v-if="editingMultiplier" ref="multiplierInputElement" v-model="multiplierInput" type="text"
+                        inputmode="decimal" aria-label="Custom recipe quantity multiplier"
                         class="w-12 border-0 bg-transparent p-0 text-center font-bold outline-none"
                         @blur="commitMultiplierInput" @keydown.enter.prevent="commitMultiplierInput"
                         @keydown.esc.prevent="cancelMultiplierInput" />
-                      <button v-else type="button" class="cursor-text" aria-label="Enter a custom recipe quantity multiplier"
-                        @click="startMultiplierInput">
+                      <button v-else type="button" class="cursor-text"
+                        aria-label="Enter a custom recipe quantity multiplier" @click="startMultiplierInput">
                         {{ multiplierLabel }}
                       </button>
                     </span>
-                    <button type="button" class="rounded-lg p-1 hover:bg-base"
-                      :disabled="!canIncreaseMultiplier" aria-label="Increase recipe quantity"
-                      @click="increaseMultiplier">
+                    <button type="button" class="rounded-lg p-1 hover:bg-base" :disabled="!canIncreaseMultiplier"
+                      aria-label="Increase recipe quantity" @click="increaseMultiplier">
                       <ChevronDoubleRightIcon class="size-5" />
                     </button>
                   </div>
@@ -148,7 +145,8 @@
                     </div>
                     <div class="md:min-w-30">
                       <RecipeIngredientHover :quantity="hoverQuantity(ingredient)" :unit="ingredient.unit"
-                        :written-unit="formatUnit(ingredient.unit, hoverQuantity(ingredient))" side-placement use-pointer>
+                        :written-unit="formatUnit(ingredient.unit, hoverQuantity(ingredient))" side-placement
+                        use-pointer>
                         <span class="text-left text-base-dark">{{ ingredient.name }}</span>
                       </RecipeIngredientHover>
                     </div>
@@ -170,10 +168,12 @@
                       {{ index + 1 }}
                     </div>
                     <div class="ml-2 mt-[2.5px] grow">
-                      <template v-for="(part, partIndex) in stepParts(stepText)" :key="`step-${index}-part-${partIndex}`">
+                      <template v-for="(part, partIndex) in stepParts(stepText)"
+                        :key="`step-${index}-part-${partIndex}`">
                         <RecipeIngredientHover v-if="part.ingredient" :quantity="hoverQuantity(part.ingredient)"
                           :unit="part.ingredient.unit"
-                          :written-unit="formatUnit(part.ingredient.unit, hoverQuantity(part.ingredient))" show-when-empty>
+                          :written-unit="formatUnit(part.ingredient.unit, hoverQuantity(part.ingredient))"
+                          show-when-empty>
                           <span class="text-accent">{{ part.text }}</span>
                         </RecipeIngredientHover>
                         <template v-else>{{ part.text }}</template>
@@ -204,7 +204,7 @@
 
         </div>
 
-        <div class="md:w-1/4 md:mt-18">
+        <div class="md:w-1/4">
 
           <div v-if="canViewPairings" class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
@@ -266,8 +266,7 @@
                   <div v-if="event.type === 'edit'" class="space-y-1 text-sm text-base-dark">
                     <div v-for="(change, index) in event.changes" :key="`${event.id}-${index}`"
                       class="flex items-center gap-1">
-                      <PlusIcon v-if="change.type === 'added'" class="size-4 shrink-0 mt-0.5"
-                        aria-hidden="true" />
+                      <PlusIcon v-if="change.type === 'added'" class="size-4 shrink-0 mt-0.5" aria-hidden="true" />
                       <MinusIcon v-else-if="change.type === 'removed'" class="size-4 shrink-0 mt-0.5"
                         aria-hidden="true" />
                       <template v-else-if="change.type === 'changed'">
