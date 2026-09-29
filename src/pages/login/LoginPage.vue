@@ -1,6 +1,6 @@
 <template>
-  <main class="flex min-h-screen items-center justify-center p-4 md:p-6">
-    <section class="w-full max-w-md rounded-2xl bg-base-alt p-6 drop-shadow-lg md:p-8" aria-labelledby="login-title">
+  <main class="flex min-h-screen items-center justify-center p-4 lg:p-6">
+    <section class="w-full max-w-md rounded-2xl bg-base-alt p-6 drop-shadow-lg lg:p-8" aria-labelledby="login-title">
       <h1 id="login-title" class="mb-6 text-4xl font-bold text-base-dark">Sign in</h1>
       <form class="space-y-5" @submit.prevent="handleLogin">
         <div>

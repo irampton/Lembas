@@ -1,5 +1,5 @@
 <template>
-  <section class="mx-auto w-full max-w-5xl p-4 md:p-6" aria-label="All recipes">
+  <section class="mx-auto w-full max-w-5xl p-4 lg:p-6" aria-label="All recipes">
     <div class="mb-4 flex items-center justify-between gap-3">
       <div class="flex items-center">
         <button type="button" class="rounded p-2 text-accent hover:bg-base-alt" :aria-expanded="activeFilter === 'cookbooks'" aria-controls="cookbook-filters" aria-label="Filter recipes by cookbook" @click="toggleFilter('cookbooks')">

@@ -224,7 +224,7 @@ const cookbookOrderBeforeDrag = ref([]);
 const cookbookWasDropped = ref(false);
 const navHidden = ref(false);
 let lastScrollY = 0;
-const mobileBreakpoint = 768;
+const mobileBreakpoint = 1024;
 
 const updateNavVisibility = () => {
   const currentScrollY = window.scrollY;
@@ -412,7 +412,7 @@ defineEmits(['go-home']);
   transform: translateX(-100%);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .app-nav {
     transition: transform 200ms ease;
   }

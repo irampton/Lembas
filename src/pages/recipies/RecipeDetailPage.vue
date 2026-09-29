@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 md:px-[15%]">
+  <div class="p-4 lg:px-[15%]">
     <div v-if="!isShareRoute && ((store.state.loading && !store.state.ready) || detailLoading)">
       Loading recipe…
     </div>
@@ -20,15 +20,15 @@
     <div v-else>
 
       <div v-if="!isShareRoute && recipeCookbook"
-        class="mr-1 max-w-48 w-min truncate rounded-full px-3 py-1 text-sm font-bold md:hidden"
+        class="mr-1 max-w-48 w-min truncate rounded-full px-3 py-1 text-sm font-bold lg:hidden"
         :style="cookbookPillStyle" :title="recipeCookbook.name">
         {{ recipeCookbook.name }}
       </div>
-      <div class="flex flex-row justify-between md:mx-5">
+      <div class="flex flex-row justify-between lg:mx-5">
         <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
-        <div class="flex flex-row items-center text-right md:mt-1 text-accent">
+        <div class="flex flex-row items-center text-right lg:mt-1 text-accent">
           <div v-if="!isShareRoute && recipeCookbook"
-            class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold hidden md:block"
+            class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold hidden lg:block"
             :style="cookbookPillStyle" :title="recipeCookbook.name">
             {{ recipeCookbook.name }}
           </div>
@@ -79,15 +79,15 @@
           </div>
         </div>
       </div>
-      <div class="flex flex-col md:flex-row md:items-center">
-        <div class="text-light pb-1 pl-px pt-px md:ml-5 shrink-0 place-self-start">
+      <div class="flex flex-col lg:flex-row lg:items-center">
+        <div class="text-light pb-1 pl-px pt-px lg:ml-5 shrink-0 place-self-start">
           <span v-if="recipe.author">{{ recipe.author }}</span>
           <span v-if="recipe.author && formattedDate"> • </span>
           <span v-if="formattedDate">{{ formattedDate }}</span>
           <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
           <span v-if="servingSize">{{ servingSize }}</span>
         </div>
-        <div v-if="hasTags" class="py-1 md:py-0 md:ml-4">
+        <div v-if="hasTags" class="py-1 lg:py-0 lg:ml-4">
           <div class="flex flex-row flex-wrap gap-2">
             <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
               {{ tag }}
@@ -96,11 +96,11 @@
         </div>
       </div>
 
-      <div class="flex flex-col md:flex-row">
+      <div class="flex flex-col lg:flex-row">
         <div>
 
-          <div class="flex flex-col md:flex-row">
-            <div class="md:w-fit md:pr-2">
+          <div class="flex flex-col lg:flex-row">
+            <div class="lg:w-fit lg:pr-2">
               <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
                 <div class="font-bold text-base-dark text-3xl pb-2">
                   Ingredients
@@ -143,7 +143,7 @@
                         scaledIngredient(ingredient).unit || "&nbsp;"
                       }}</span>
                     </div>
-                    <div class="md:min-w-30">
+                    <div class="lg:min-w-30">
                       <RecipeIngredientHover :quantity="hoverQuantity(ingredient)" :unit="ingredient.unit"
                         :ingredient-name="ingredient.name"
                         :unit-system="selectedUnitSystem"
@@ -159,7 +159,7 @@
 
             <div class="w-full">
               <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
-                <div class="font-bold text-base-dark text-3xl pb-3 md:pb-2">
+                <div class="font-bold text-base-dark text-3xl pb-3 lg:pb-2">
                   Steps
                 </div>
                 <div v-for="(stepText, index) in recipe.steps" :key="`step-${index}`">
@@ -208,7 +208,7 @@
 
         </div>
 
-        <div class="md:w-1/4">
+        <div class="lg:w-1/4">
 
           <div v-if="canViewPairings" class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">

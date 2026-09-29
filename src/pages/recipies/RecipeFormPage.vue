@@ -1,8 +1,8 @@
 <template>
-  <section class="mx-auto w-full max-w-5xl p-4 md:p-6">
+  <section class="mx-auto w-full max-w-5xl p-4 lg:p-6">
     <form class="space-y-6" @submit.prevent="save">
-      <header class="flex items-center justify-between gap-4 md:mx-5">
-        <h1 class="font-bold text-3xl text-base-dark md:text-4xl">
+      <header class="flex items-center justify-between gap-4 lg:mx-5">
+        <h1 class="font-bold text-3xl text-base-dark lg:text-4xl">
           {{ isEditing ? "Edit recipe" : "New recipe" }}
         </h1>
         <div class="flex items-center gap-1">
@@ -20,7 +20,7 @@
             aria-label="Import recipe"
             title="Import recipe"
           >
-            <ArrowRightEndOnRectangleIcon class="size-6 md:size-8" aria-hidden="true" />
+            <ArrowRightEndOnRectangleIcon class="size-6 lg:size-8" aria-hidden="true" />
           </RouterLink>
           <div class="rounded-xl p-1 pt-2 hover:bg-base-alt">
           <button
@@ -30,7 +30,7 @@
             :aria-label="isSaving ? 'Saving recipe' : 'Save recipe'"
             :title="isSaving ? 'Saving…' : 'Save recipe'"
           >
-            <CheckCircleIcon class="size-6 md:size-8" aria-hidden="true" />
+            <CheckCircleIcon class="size-6 lg:size-8" aria-hidden="true" />
           </button>
           </div>
         </div>
@@ -44,7 +44,7 @@
       </p>
 
       <div
-        class="relative rounded-2xl bg-base-alt p-4 drop-shadow-lg focus-within:z-30 md:m-2 md:mt-6 md:p-5"
+        class="relative rounded-2xl bg-base-alt p-4 drop-shadow-lg focus-within:z-30 lg:m-2 lg:mt-6 lg:p-5"
       >
         <div class="space-y-4">
           <BaseTextInput
@@ -54,14 +54,14 @@
             xl
             required
           />
-          <div class="flex flex-col gap-4 md:flex-row md:mx-4">
-            <label class="flex w-full items-center gap-2 md:w-1/2">
+          <div class="flex flex-col gap-4 lg:flex-row lg:mx-4">
+            <label class="flex w-full items-center gap-2 lg:w-1/2">
               <span class="shrink-0 text-base-dark">by</span>
               <span class="min-w-0 grow">
                 <BaseTextInput v-model="form.author" placeholder="Author" />
               </span>
             </label>
-            <div class="flex w-full items-center gap-2 md:w-1/2">
+            <div class="flex w-full items-center gap-2 lg:w-1/2">
               <span class="w-28 shrink-0">
                 <BaseDropdown
                   v-model="form.servingsVerb"
@@ -89,7 +89,7 @@
               </span>
             </div>
           </div>
-          <div class="flex gap-2 md:mx-4 items-center">
+          <div class="flex gap-2 lg:mx-4 items-center">
             <button
               type="button"
               class="rounded-full p-1 text-accent hover:bg-white"
@@ -124,7 +124,7 @@
       </div>
 
       <div
-        class="relative rounded-2xl bg-base-alt p-4 drop-shadow-lg focus-within:z-20 md:m-2 md:mt-6 md:p-5"
+        class="relative rounded-2xl bg-base-alt p-4 drop-shadow-lg focus-within:z-20 lg:m-2 lg:mt-6 lg:p-5"
       >
         <h2 class="mb-3 font-bold text-3xl text-base-dark">Ingredients</h2>
         <div class="space-y-2">
@@ -133,12 +133,12 @@
             :key="ingredient.id"
             class="relative flex w-full flex-row focus-within:z-20"
           >
-            <div class="grow flex flex-col md:flex-row mt-2 md:mt-0">
-              <div class="mb-2 md:mr-2 w-full">
+            <div class="grow flex flex-col lg:flex-row mt-2 lg:mt-0">
+              <div class="mb-2 lg:mr-2 w-full">
                 <BaseTextInput
                   v-model="ingredient.name"
                   aria-label="Ingredient name"
-                  class="col-span-3 md:col-span-1"
+                  class="col-span-3 lg:col-span-1"
                 />
               </div>
               <div class="flex flex-row">
@@ -173,7 +173,7 @@
         </button>
       </div>
       <div
-        class="rounded-2xl bg-base-alt p-4 drop-shadow-lg md:m-2 md:mt-6 md:p-5"
+        class="rounded-2xl bg-base-alt p-4 drop-shadow-lg lg:m-2 lg:mt-6 lg:p-5"
       >
         <h2 class="mb-3 font-bold text-3xl text-base-dark">Steps</h2>
         <div class="space-y-3">
@@ -212,7 +212,7 @@
         </button>
       </div>
       <div
-        class="rounded-2xl bg-base-alt p-4 drop-shadow-lg md:m-2 md:mt-6 md:p-5"
+        class="rounded-2xl bg-base-alt p-4 drop-shadow-lg lg:m-2 lg:mt-6 lg:p-5"
       >
         <label>
           <span class="mb-2 block font-bold text-3xl text-base-dark">
@@ -221,7 +221,7 @@
           <BaseTextArea v-model="form.notes" rows="5" />
         </label>
       </div>
-      <div class="flex justify-end md:mt-6 md:mx-5">
+      <div class="flex justify-end lg:mt-6 lg:mx-5">
         <BaseButton
           class="mr-2"
           colorType="cancel"

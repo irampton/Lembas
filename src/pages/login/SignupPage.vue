@@ -1,6 +1,6 @@
 <template>
-  <main class="flex min-h-screen items-center justify-center p-4 md:p-6">
-    <section class="w-full max-w-md rounded-2xl bg-base-alt p-6 drop-shadow-lg md:p-8" aria-labelledby="signup-title">
+  <main class="flex min-h-screen items-center justify-center p-4 lg:p-6">
+    <section class="w-full max-w-md rounded-2xl bg-base-alt p-6 drop-shadow-lg lg:p-8" aria-labelledby="signup-title">
       <h1 id="signup-title" class="mb-6 text-4xl font-bold text-base-dark">Create an account</h1>
       <form class="space-y-5" @submit.prevent="handleSignup">
         <div>

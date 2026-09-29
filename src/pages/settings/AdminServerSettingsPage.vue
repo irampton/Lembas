@@ -1,16 +1,16 @@
 <template>
-  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:flex-row lg:items-start">
+  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-6 lg:flex-row lg:items-start">
     <SettingsSidebar />
     <section class="min-w-0 flex-1">
       <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <div class="text-3xl font-bold md:text-4xl">LLM Settings</div>
+            <div class="text-3xl font-bold lg:text-4xl">LLM Settings</div>
         </div>
       </header>
 
       <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-4 md:flex-row md:items-start">
-        <form class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6" @submit.prevent="save">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <form class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-6" @submit.prevent="save">
           <div class="mb-6 flex items-start justify-between gap-5 border-b border-accent-alt/15 pb-6">
             <div>
               <h2 class="text-xl font-bold">Recipe Import via LLM</h2>
@@ -70,7 +70,7 @@
           </div>
         </form>
 
-        <aside class="rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6 h-min" aria-label="LLM import status">
+        <aside class="rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-6 h-min" aria-label="LLM import status">
           <div class="flex items-start justify-between gap-4">
             <div>
               <h2 class="text-xl font-bold">Status</h2>
@@ -95,7 +95,7 @@
         </aside>
         </div>
 
-        <section class="w-full rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6">
+        <section class="w-full rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-6">
           <div class="mb-3 flex items-center justify-between gap-3">
             <h2 class="text-xl font-bold">User access</h2>
             <BaseSplitButton

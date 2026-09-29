@@ -1,11 +1,11 @@
 <template>
-  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:flex-row lg:items-start">
+  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-6 lg:flex-row lg:items-start">
     <SettingsSidebar />
     <section class="min-w-0 flex-1" aria-labelledby="users-title">
       <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
          <div>
             <div class="text-accent text-md font-bold uppercase">Admin</div>
-            <div class="text-3xl font-bold md:text-4xl">Users</div>
+            <div class="text-3xl font-bold lg:text-4xl">Users</div>
         </div>
         <BaseButton
           colorType="cancel" 
@@ -20,7 +20,7 @@
       <p v-if="state.error" role="alert" class="mb-5 rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700">{{
         state.error }}</p>
 
-      <article class="mb-5 rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6">
+      <article class="mb-5 rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-6">
         <div class="mb-5 flex items-start gap-3">
           <div>
             <h2 class="text-xl font-bold">Create Join Code</h2>
@@ -43,7 +43,7 @@
 
       <div class="grid gap-5 xl:grid-cols-2">
         <article class="overflow-hidden rounded-2xl bg-base-alt drop-shadow-lg">
-          <div class="flex items-center justify-between gap-3 p-5 pb-4 md:px-6">
+          <div class="flex items-center justify-between gap-3 p-5 pb-4 lg:px-6">
             <div>
               <h2 class="text-xl font-bold">Members</h2>
             </div>
@@ -54,7 +54,7 @@
           <p v-if="state.loading" role="status" class="px-6 py-8 text-center text-light">Loading users…</p>
           <ul v-else-if="state.users.length" class="divide-y divide-accent-alt/15 border-t border-accent-alt/15">
             <li v-for="user in state.users" :key="user.id"
-              class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 md:px-6">
+              class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 lg:px-6">
               <div class="flex min-w-0 items-center gap-3">
                 <div
                   class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-bold text-accent">
@@ -84,7 +84,7 @@
         </article>
 
         <article class="overflow-hidden rounded-2xl bg-base-alt drop-shadow-lg">
-          <div class="flex items-center justify-between gap-3 p-5 pb-4 md:px-6">
+          <div class="flex items-center justify-between gap-3 p-5 pb-4 lg:px-6">
             <div>
               <h2 class="text-xl font-bold">Active Join Codes</h2>
             </div>
@@ -92,7 +92,7 @@
           <p v-if="state.loading" role="status" class="px-6 py-8 text-center text-light">Loading codes…</p>
           <ul v-else-if="state.joinCodes.length" class="divide-y divide-accent-alt/15 border-t border-accent-alt/15">
             <li v-for="code in state.joinCodes" :key="code.code"
-              class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 md:px-6">
+              class="flex items-center justify-between gap-3 bg-white/30 px-5 py-4 lg:px-6">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2"><button type="button"
                     class="rounded px-1 font-bold tracking-wider text-base-dark hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"

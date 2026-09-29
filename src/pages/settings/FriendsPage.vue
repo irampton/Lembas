@@ -1,10 +1,10 @@
 <template>
-  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:flex-row lg:items-start">
+  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-6 lg:flex-row lg:items-start">
     <SettingsSidebar />
 
     <section class="min-w-0 flex-1" aria-labelledby="friends-title">
       <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <h1 id="friends-title" class="text-3xl font-bold text-base-dark md:text-4xl">Friends</h1>
+        <h1 id="friends-title" class="text-3xl font-bold text-base-dark lg:text-4xl">Friends</h1>
         <BaseButton colorType="cancel" class="self-start bg-base-alt text-sm shadow-sm sm:self-auto"
           :disabled="friendStore.state.loading" @click="refresh">
           <span class="flex items-center gap-2 mt-1">
@@ -16,8 +16,8 @@
       <p v-if="pageError" role="alert" class="mb-5 rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700">{{ pageError }}
       </p>
 
-      <div class="flex flex-col gap-4 md:flex-row md:items-start">
-        <article class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <article class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-6">
           <div class="mb-5 flex items-center justify-between gap-3">
             <h2 class="text-xl font-bold">Add Friend</h2>
             <MagnifyingGlassIcon class="size-6 text-accent" />
@@ -52,7 +52,7 @@
           </ul>
         </article>
 
-        <article class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-6">
+        <article class="h-min grow rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-6">
           <div class="mb-4 flex items-center justify-between gap-3">
             <h2 class="text-xl font-bold">Your friends</h2>
             <div class="flex items-center gap-2">

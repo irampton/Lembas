@@ -1,10 +1,10 @@
 <template>
-  <section class="mx-auto w-full max-w-5xl p-4 md:p-6">
+  <section class="mx-auto w-full max-w-5xl p-4 lg:p-6">
     <form class="flex flex-col gap-6" @submit.prevent="submit">
-      <header class="flex items-center justify-between gap-4 md:mx-5">
-        <h1 class="text-3xl font-bold text-base-dark md:text-4xl">Import recipe</h1>
+      <header class="flex items-center justify-between gap-4 lg:mx-5">
+        <h1 class="text-3xl font-bold text-base-dark lg:text-4xl">Import recipe</h1>
         <RouterLink :to="newRecipeRoute" class="rounded-xl p-2 text-accent hover:bg-base-alt" aria-label="Back to new recipe" title="Back">
-          <ArrowLeftIcon class="size-6 md:size-8" aria-hidden="true" />
+          <ArrowLeftIcon class="size-6 lg:size-8" aria-hidden="true" />
         </RouterLink>
       </header>
 
@@ -13,7 +13,7 @@
         LLM import is unavailable.
       </p>
 
-      <div class="flex flex-col gap-4 rounded-2xl bg-base-alt p-4 drop-shadow-lg md:m-2 md:p-5">
+      <div class="flex flex-col gap-4 rounded-2xl bg-base-alt p-4 drop-shadow-lg lg:m-2 lg:p-5">
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-3xl font-bold text-base-dark">Recipe</h2>
           <button v-if="visionCapable && imageData" type="button" class="rounded-lg p-2 text-accent hover:bg-white" aria-label="Remove image" title="Remove image" @click="clearImage">
@@ -41,7 +41,7 @@
 
       <p v-if="error" role="alert" class="rounded-lg bg-red-50 p-3 text-red-700">{{ error }}</p>
 
-      <div class="flex justify-end gap-2 md:mx-5">
+      <div class="flex justify-end gap-2 lg:mx-5">
         <BaseButton color-type="cancel" @click="$router.push(newRecipeRoute)">Cancel</BaseButton>
         <BaseButton native-type="submit" color-type="submit" :disabled="controlsDisabled">
           <span class="flex items-center gap-2">

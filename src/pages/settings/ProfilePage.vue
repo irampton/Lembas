@@ -1,13 +1,13 @@
 <template>
-  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:flex-row lg:items-start">
+  <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-6 lg:flex-row lg:items-start">
     <SettingsSidebar />
 
     <section class="min-w-0 flex-1" aria-labelledby="profile-title">
-      <h1 id="profile-title" class="mb-6 text-3xl font-bold text-base-dark md:text-4xl">Profile</h1>
-      <article class="flex items-center gap-5 rounded-2xl bg-base-alt p-5 drop-shadow-lg md:p-8">
-        <UserCircleIcon class="size-20 shrink-0 text-primary md:size-24" aria-hidden="true" />
+      <h1 id="profile-title" class="mb-6 text-3xl font-bold text-base-dark lg:text-4xl">Profile</h1>
+      <article class="flex items-center gap-5 rounded-2xl bg-base-alt p-5 drop-shadow-lg lg:p-8">
+        <UserCircleIcon class="size-20 shrink-0 text-primary lg:size-24" aria-hidden="true" />
         <div class="min-w-0 flex-1">
-          <p class="truncate text-3xl font-bold text-base-dark md:text-4xl">
+          <p class="truncate text-3xl font-bold text-base-dark lg:text-4xl">
             {{ auth.state.user?.displayName || auth.state.user?.username }}
           </p>
           <p class="mt-1 truncate text-sm font-semibold lowercase tracking-widest text-light">
