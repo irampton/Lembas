@@ -103,15 +103,23 @@
                 </div>
                 <div class="flex items-center justify-between gap-3 pb-3 text-accent" aria-label="Recipe quantity">
                   <div class="flex flex-row items-center">
-                    <button type="button" class="rounded-lg p-1 hover:bg-base" :disabled="multiplierIndex === 0"
+                    <button type="button" class="rounded-lg p-1 hover:bg-base" :disabled="!canDecreaseMultiplier"
                       aria-label="Decrease recipe quantity" @click="decreaseMultiplier">
                       <ChevronDoubleLeftIcon class="size-5" />
                     </button>
                     <span class="min-w-10 text-center font-bold text-base-dark" aria-live="polite">
-                      {{ multiplierLabel }}
+                      <input v-if="editingMultiplier" ref="multiplierInputElement" v-model="multiplierInput"
+                        type="text" inputmode="decimal" aria-label="Custom recipe quantity multiplier"
+                        class="w-12 border-0 bg-transparent p-0 text-center font-bold outline-none"
+                        @blur="commitMultiplierInput" @keydown.enter.prevent="commitMultiplierInput"
+                        @keydown.esc.prevent="cancelMultiplierInput" />
+                      <button v-else type="button" class="cursor-text" aria-label="Enter a custom recipe quantity multiplier"
+                        @click="startMultiplierInput">
+                        {{ multiplierLabel }}
+                      </button>
                     </span>
                     <button type="button" class="rounded-lg p-1 hover:bg-base"
-                      :disabled="multiplierIndex === MULTIPLIERS.length - 1" aria-label="Increase recipe quantity"
+                      :disabled="!canIncreaseMultiplier" aria-label="Increase recipe quantity"
                       @click="increaseMultiplier">
                       <ChevronDoubleRightIcon class="size-5" />
                     </button>
@@ -301,7 +309,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { ArrowRightIcon, ArrowUpOnSquareIcon, ChatBubbleBottomCenterTextIcon, CheckCircleIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, MinusIcon, PencilIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import BaseFloatingBox from "../../baseComponents/BaseFloatingBox.vue";
@@ -348,6 +356,10 @@ const editRemoving = ref(false);
 const editRemovalError = ref("");
 const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 1.5, 2, 3, 4, 5, 6, 7, 8]);
 const multiplierIndex = ref(MULTIPLIERS.indexOf(1));
+const customMultiplier = ref(null);
+const editingMultiplier = ref(false);
+const multiplierInput = ref("");
+const multiplierInputElement = ref(null);
 const unitSystem = ref("customary");
 const unitSystemOptions = Object.freeze([
   { value: "customary", label: "C" },
@@ -423,13 +435,39 @@ const servingSize = computed(() => {
   return combined ? `${verb} ${combined}` : "";
 });
 
-const multiplier = computed(() => MULTIPLIERS[multiplierIndex.value]);
+const multiplier = computed(() => customMultiplier.value ?? MULTIPLIERS[multiplierIndex.value]);
 const multiplierLabel = computed(() => `${formatQuantity(multiplier.value)}x`);
+const canDecreaseMultiplier = computed(() => MULTIPLIERS.some((value) => value < multiplier.value));
+const canIncreaseMultiplier = computed(() => MULTIPLIERS.some((value) => value > multiplier.value));
+const startMultiplierInput = async () => {
+  multiplierInput.value = `${multiplier.value}`;
+  editingMultiplier.value = true;
+  await nextTick();
+  multiplierInputElement.value?.select();
+};
+const cancelMultiplierInput = () => {
+  editingMultiplier.value = false;
+  multiplierInput.value = "";
+};
+const commitMultiplierInput = () => {
+  const value = parseQuantity(multiplierInput.value);
+  if (Number.isFinite(value) && value > 0) customMultiplier.value = value;
+  cancelMultiplierInput();
+};
 const increaseMultiplier = () => {
-  multiplierIndex.value = Math.min(multiplierIndex.value + 1, MULTIPLIERS.length - 1);
+  const nextIndex = MULTIPLIERS.findIndex((value) => value > multiplier.value);
+  if (nextIndex < 0) return;
+  customMultiplier.value = null;
+  multiplierIndex.value = nextIndex;
 };
 const decreaseMultiplier = () => {
-  multiplierIndex.value = Math.max(multiplierIndex.value - 1, 0);
+  let previousIndex = -1;
+  MULTIPLIERS.forEach((value, index) => {
+    if (value < multiplier.value) previousIndex = index;
+  });
+  if (previousIndex < 0) return;
+  customMultiplier.value = null;
+  multiplierIndex.value = previousIndex;
 };
 
 const addToMyRecipes = () => {
