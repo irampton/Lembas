@@ -22,12 +22,17 @@
       <div class="flex flex-col md:flex-row">
         <div>
 
+          <div v-if="!isShareRoute && recipeCookbook"
+            class="mr-1 max-w-48 w-min truncate rounded-full px-3 py-1 text-sm font-bold md:hidden"
+            :style="cookbookPillStyle" :title="recipeCookbook.name">
+            {{ recipeCookbook.name }}
+          </div>
           <div class="flex flex-row justify-between md:mx-5">
             <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
             <div class="flex flex-row items-center text-right md:mt-1 text-accent">
               <div v-if="!isShareRoute && recipeCookbook"
-                class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold" :style="cookbookPillStyle"
-                :title="recipeCookbook.name">
+                class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold hidden md:block"
+                :style="cookbookPillStyle" :title="recipeCookbook.name">
                 {{ recipeCookbook.name }}
               </div>
               <button v-if="isShareRoute && auth.state.user" type="button"
@@ -38,13 +43,13 @@
               <div v-if="!isShareRoute" class="rounded-xl p-1 hover:bg-base-alt">
                 <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
                   aria-label="Edit recipe">
-                  <PencilIcon class="size-6 md:size-8" />
+                  <PencilIcon class="size-8" />
                 </RouterLink>
               </div>
               <div v-if="canManageShare" class="relative">
                 <button type="button" class="rounded-xl p-1 hover:bg-base-alt" aria-label="Share recipe"
                   :aria-expanded="shareMenuOpen" @click.stop="toggleShareMenu">
-                  <ArrowUpOnSquareIcon class="size-6 md:size-8" />
+                  <ArrowUpOnSquareIcon class="size-8" />
                 </button>
                 <BaseFloatingBox v-if="shareMenuOpen" class="absolute right-0 top-full z-10 mt-2 w-80 text-left"
                   @clickaway="shareMenuOpen = false">
@@ -72,13 +77,23 @@
               </div>
             </div>
           </div>
-          <div class="text-light pb-1 pl-px pt-px md:ml-5">
-            <span v-if="recipe.author">{{ recipe.author }}</span>
-            <span v-if="recipe.author && formattedDate"> • </span>
-            <span v-if="formattedDate">{{ formattedDate }}</span>
-            <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
-            <span v-if="servingSize">{{ servingSize }}</span>
+          <div class="flex flex-col md:flex-row md:items-center">
+            <div class="text-light pb-1 pl-px pt-px md:ml-5 shrink-0 place-self-start">
+              <span v-if="recipe.author">{{ recipe.author }}</span>
+              <span v-if="recipe.author && formattedDate"> • </span>
+              <span v-if="formattedDate">{{ formattedDate }}</span>
+              <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
+              <span v-if="servingSize">{{ servingSize }}</span>
+            </div>
+            <div v-if="hasTags" class="py-1 md:py-0 md:ml-4">
+              <div class="flex flex-row flex-wrap gap-2">
+                <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
+                  {{ tag }}
+                </BaseTag>
+              </div>
+            </div>
           </div>
+
 
           <div class="flex flex-col md:flex-row">
             <div class="md:w-fit md:pr-2">
@@ -163,19 +178,11 @@
         <div class="font-bold text-base-dark text-3xl py-3">History</div>
       </div>
       -->
-          <div v-if="hasTags">
-            <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 md:mt-4 m-2">
-              <div class="flex flex-row flex-wrap gap-2">
-                <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
-                  {{ tag }}
-                </BaseTag>
-              </div>
-            </div>
-          </div>
+
 
         </div>
 
-        <div class="md:w-1/5 md:mt-18">
+        <div class="md:w-1/4 md:mt-18">
           <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
               <div class="font-bold text-base-dark text-xl">
@@ -186,8 +193,8 @@
                 <PlusIcon class="size-6 text-accent" />
               </button>
             </div>
-            <BaseAutocomplete v-if="pairingPickerOpen" v-model="pairingQuery" :options="pairingOptions"
-              class="mt-3" placeholder="Search recipes" aria-label="Search recipes to pair" :disabled="pairingSaving"
+            <BaseAutocomplete v-if="pairingPickerOpen" v-model="pairingQuery" :options="pairingOptions" class="mt-3"
+              placeholder="Search recipes" aria-label="Search recipes to pair" :disabled="pairingSaving"
               @commit="selectPairing" />
             <p v-if="pairingError" class="mt-2 text-sm text-error" role="alert">{{ pairingError }}</p>
             <ul v-if="recipe.pairings?.length" class="mt-3 space-y-1">
