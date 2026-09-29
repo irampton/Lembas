@@ -101,7 +101,7 @@
 
           <div class="flex flex-col lg:flex-row">
             <div class="lg:w-fit lg:pr-2">
-              <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+              <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
                 <div class="font-bold text-base-dark text-3xl pb-2">
                   Ingredients
                 </div>
@@ -158,7 +158,7 @@
             </div>
 
             <div class="w-full">
-              <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+              <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
                 <div class="font-bold text-base-dark text-3xl pb-3 lg:pb-2">
                   Steps
                 </div>
@@ -190,7 +190,7 @@
           </div>
 
           <div v-if="hasNotes">
-            <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+            <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
               <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
               {{ recipe.notes }}
             </div>
@@ -210,7 +210,7 @@
 
         <div class="lg:w-1/4">
 
-          <div v-if="canViewPairings" class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div v-if="canViewPairings" class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
               <div class="font-bold text-base-dark text-xl">
                 Parings
@@ -242,7 +242,7 @@
             </ul>
           </div>
 
-          <div v-if="canViewHistory" class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+          <div v-if="canViewHistory" class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
             <div class="flex flex-row justify-between items-center">
               <div class="font-bold text-base-dark text-xl">
                 History

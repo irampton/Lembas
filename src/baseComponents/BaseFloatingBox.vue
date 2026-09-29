@@ -1,5 +1,5 @@
 <template>
-  <div ref="floatingBox" class="rounded-2xl border border-accent bg-white p-3 shadow-lg">
+  <div ref="floatingBox" class="!z-50 rounded-2xl border border-accent bg-white p-3 shadow-lg">
     <slot />
   </div>
 </template>
