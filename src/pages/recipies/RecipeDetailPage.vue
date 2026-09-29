@@ -314,7 +314,7 @@ import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
 import RecipeIngredientHover from "../../shared/RecipeIngredientHover.vue";
 import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
-import { formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
+import { formatMilliliters, formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
 
 const store = useRecipeStore();
 const auth = useAuthStore();
@@ -677,7 +677,8 @@ const scaledIngredient = (ingredient) => {
       return { quantity, unit: formatUnit(ingredient.unit, quantity) };
     }
     const [unit, factor] = target;
-    const quantity = formatQuantity(baseAmount / factor);
+    const convertedAmount = baseAmount / factor;
+    const quantity = unit === "ml" ? formatMilliliters(convertedAmount) : formatQuantity(convertedAmount);
     return { quantity, unit: formatUnit(unit, quantity) };
   }
   const quantity = formatQuantity(scaledAmount);

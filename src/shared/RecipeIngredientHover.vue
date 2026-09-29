@@ -19,7 +19,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import BaseFloatingBox from "../baseComponents/BaseFloatingBox.vue";
-import { getUnit, parseQuantity } from "../mixins/units.js";
+import { formatMilliliters, getUnit, parseQuantity } from "../mixins/units.js";
 
 const props = defineProps({
   quantity: { type: [String, Number], default: "" },
@@ -87,7 +87,7 @@ const conversions = computed(() => {
       return {
         unit,
         label,
-        amount: formatAmount(convertedAmount),
+        amount: unit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
         convertedAmount,
       };
     })
