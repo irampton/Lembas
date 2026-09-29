@@ -133,9 +133,10 @@
                       }}</span>
                     </div>
                     <div class="md:min-w-30">
-                      <span class="text-left text-base-dark">{{
-                        ingredient.name
-                      }}</span>
+                      <RecipeIngredientHover :quantity="hoverQuantity(ingredient)" :unit="ingredient.unit"
+                        :written-unit="formatUnit(ingredient.unit, hoverQuantity(ingredient))" side-placement use-pointer>
+                        <span class="text-left text-base-dark">{{ ingredient.name }}</span>
+                      </RecipeIngredientHover>
                     </div>
                   </div>
                 </div>
@@ -155,7 +156,14 @@
                       {{ index + 1 }}
                     </div>
                     <div class="ml-2 mt-[2.5px] grow">
-                      {{ stepText }}
+                      <template v-for="(part, partIndex) in stepParts(stepText)" :key="`step-${index}-part-${partIndex}`">
+                        <RecipeIngredientHover v-if="part.ingredient" :quantity="hoverQuantity(part.ingredient)"
+                          :unit="part.ingredient.unit"
+                          :written-unit="formatUnit(part.ingredient.unit, hoverQuantity(part.ingredient))" show-when-empty>
+                          <span class="text-accent">{{ part.text }}</span>
+                        </RecipeIngredientHover>
+                        <template v-else>{{ part.text }}</template>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -303,6 +311,7 @@ import BaseTag from "../../baseComponents/BaseTag.vue";
 import BaseSplitButton from "../../baseComponents/BaseSplitButton.vue";
 import BaseToggle from "../../baseComponents/BaseToggle.vue";
 import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
+import RecipeIngredientHover from "../../shared/RecipeIngredientHover.vue";
 import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
 import { formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
@@ -673,6 +682,37 @@ const scaledIngredient = (ingredient) => {
   }
   const quantity = formatQuantity(scaledAmount);
   return { quantity, unit: formatUnit(ingredient.unit, quantity) };
+};
+
+const hoverQuantity = (ingredient) => {
+  const original = ingredient?.quantity?.toString?.().trim() || "";
+  const parsed = parseQuantity(original);
+  return Number.isFinite(parsed) ? formatQuantity(parsed * multiplier.value) : original;
+};
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const stepParts = (stepText) => {
+  const ingredientsByName = new Map();
+  (recipe.value?.ingredients || []).forEach((ingredient) => {
+    const name = ingredient?.name?.toString?.().trim();
+    if (name && !ingredientsByName.has(name.toLocaleLowerCase())) {
+      ingredientsByName.set(name.toLocaleLowerCase(), ingredient);
+    }
+  });
+  const names = [...ingredientsByName.keys()].sort((a, b) => b.length - a.length);
+  const text = stepText?.toString?.() || "";
+  if (!names.length) return [{ text }];
+
+  const matcher = new RegExp(names.map(escapeRegExp).join("|"), "gi");
+  const parts = [];
+  let lastIndex = 0;
+  for (const match of text.matchAll(matcher)) {
+    if (match.index > lastIndex) parts.push({ text: text.slice(lastIndex, match.index) });
+    parts.push({ text: match[0], ingredient: ingredientsByName.get(match[0].toLocaleLowerCase()) });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) parts.push({ text: text.slice(lastIndex) });
+  return parts.length ? parts : [{ text }];
 };
 
 const formattedDate = computed(() => {
