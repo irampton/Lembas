@@ -1,5 +1,9 @@
 <template>
-  <div v-if="isPublicMinimalRoute && !auth.state.user" class="sticky top-0 z-100 flex w-full items-center justify-between bg-primary p-4">
+  <div
+    v-if="isPublicMinimalRoute && !auth.state.user"
+    class="app-nav sticky top-0 z-100 flex w-full items-center justify-between bg-primary p-4"
+    :class="{ 'app-nav--hidden': navHidden }"
+  >
     <RouterLink
       :to="auth.state.user ? { name: 'home' } : { name: 'login', query: { redirect: route.fullPath } }"
       aria-label="Recipeas home"
@@ -14,7 +18,11 @@
       Log in
     </RouterLink>
   </div>
-  <div v-else class="w-full flex flex-row items-center justify-between sticky top-0 bg-primary p-4 z-100">
+  <div
+    v-else
+    class="app-nav sticky top-0 z-100 flex w-full flex-row items-center justify-between bg-primary p-4"
+    :class="{ 'app-nav--hidden': navHidden }"
+  >
     <div class="flex items-center gap-4">
       <button
         type="button"
@@ -177,7 +185,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
   ArrowRightEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,
@@ -214,6 +222,28 @@ const editCookbook = ref(null);
 const draggedCookbookId = ref(null);
 const cookbookOrderBeforeDrag = ref([]);
 const cookbookWasDropped = ref(false);
+const navHidden = ref(false);
+let lastScrollY = 0;
+const mobileBreakpoint = 768;
+
+const updateNavVisibility = () => {
+  const currentScrollY = window.scrollY;
+
+  if (window.innerWidth >= mobileBreakpoint || currentScrollY <= 0) {
+    navHidden.value = false;
+  } else if (currentScrollY > lastScrollY) {
+    navHidden.value = true;
+  } else if (currentScrollY < lastScrollY) {
+    navHidden.value = false;
+  }
+
+  lastScrollY = currentScrollY;
+};
+
+const resetNavVisibilityForDesktop = () => {
+  if (window.innerWidth >= mobileBreakpoint) navHidden.value = false;
+  lastScrollY = window.scrollY;
+};
 
 const startCookbookDrag = (cookbookId, event) => {
   draggedCookbookId.value = cookbookId;
@@ -348,6 +378,14 @@ const logOut = async () => {
 
 onMounted(() => {
   settings.loadSettings().catch((error) => console.error(error));
+  lastScrollY = window.scrollY;
+  window.addEventListener('scroll', updateNavVisibility, { passive: true });
+  window.addEventListener('resize', resetNavVisibilityForDesktop);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', updateNavVisibility);
+  window.removeEventListener('resize', resetNavVisibilityForDesktop);
 });
 
 defineEmits(['go-home']);
@@ -372,5 +410,15 @@ defineEmits(['go-home']);
 .sidebar-enter-from :deep(aside),
 .sidebar-leave-to :deep(aside) {
   transform: translateX(-100%);
+}
+
+@media (max-width: 767px) {
+  .app-nav {
+    transition: transform 200ms ease;
+  }
+
+  .app-nav--hidden {
+    transform: translateY(-100%);
+  }
 }
 </style>
