@@ -59,6 +59,84 @@ export const UNITS = Object.freeze([
 
 export const UNIT_VALUES = Object.freeze(UNITS.map(({ value }) => value));
 
+// Approximate kitchen densities in grams per milliliter.  Values are based on
+// the common US cup weights used by major baking references; recipes are still
+// inherently approximate because packing, sifting, and brand vary.  Keep the
+// aliases deliberately specific where a broad term (for example "flour") has
+// a more useful subtype.
+export const INGREDIENT_DENSITIES = Object.freeze([
+  { names: ['all-purpose flour', 'all purpose flour', 'plain flour', 'ap flour'], gramsPerMilliliter: 0.507 },
+  { names: ['bread flour', 'strong flour'], gramsPerMilliliter: 0.537 },
+  { names: ['whole wheat flour', 'wholemeal flour', 'whole-wheat flour', 'wheat flour'], gramsPerMilliliter: 0.541 },
+  { names: ['cake flour'], gramsPerMilliliter: 0.425 },
+  { names: ['pastry flour'], gramsPerMilliliter: 0.457 },
+  { names: ['self-rising flour', 'self raising flour', 'self-rising'], gramsPerMilliliter: 0.507 },
+  { names: ['spelt flour'], gramsPerMilliliter: 0.507 },
+  { names: ['gluten-free flour', 'gluten free flour'], gramsPerMilliliter: 0.507 },
+  { names: ['semolina flour', 'semolina'], gramsPerMilliliter: 0.676 },
+  { names: ['rye flour'], gramsPerMilliliter: 0.432 },
+  { names: ['almond flour', 'almond meal'], gramsPerMilliliter: 0.406 },
+  { names: ['coconut flour'], gramsPerMilliliter: 0.475 },
+  { names: ['flour'], gramsPerMilliliter: 0.507 },
+  { names: ['brown sugar', 'light brown sugar', 'dark brown sugar'], gramsPerMilliliter: 0.93 },
+  { names: ['powdered sugar', 'confectioners sugar', "confectioner's sugar", 'icing sugar'], gramsPerMilliliter: 0.507 },
+  { names: ['granulated sugar', 'white sugar', 'caster sugar', 'castor sugar', 'sugar'], gramsPerMilliliter: 0.845 },
+  { names: ['butter', 'margarine'], gramsPerMilliliter: 0.959 },
+  { names: ['whole milk', 'skim milk', 'milk'], gramsPerMilliliter: 1.03 },
+  { names: ['heavy cream', 'whipping cream', 'double cream', 'cream'], gramsPerMilliliter: 0.994 },
+  { names: ['sour cream'], gramsPerMilliliter: 1.02 },
+  { names: ['greek yogurt', 'yogurt', 'yoghurt'], gramsPerMilliliter: 1.03 },
+  { names: ['cream cheese'], gramsPerMilliliter: 0.98 },
+  { names: ['water', 'ice'], gramsPerMilliliter: 1 },
+  { names: ['honey'], gramsPerMilliliter: 1.42 },
+  { names: ['maple syrup', 'corn syrup', 'golden syrup'], gramsPerMilliliter: 1.33 },
+  { names: ['molasses', 'treacle'], gramsPerMilliliter: 1.4 },
+  { names: ['olive oil', 'vegetable oil', 'canola oil', 'coconut oil', 'oil'], gramsPerMilliliter: 0.91 },
+  { names: ['peanut butter', 'nut butter'], gramsPerMilliliter: 1.06 },
+  { names: ['cocoa powder', 'cacao powder'], gramsPerMilliliter: 0.423 },
+  { names: ['rolled oats', 'old-fashioned oats', 'quick oats', 'oatmeal', 'oats'], gramsPerMilliliter: 0.338 },
+  { names: ['uncooked rice', 'white rice', 'brown rice', 'rice'], gramsPerMilliliter: 0.824 },
+  { names: ['table salt', 'kosher salt', 'sea salt', 'salt'], gramsPerMilliliter: 1.15 },
+  { names: ['active dry yeast', 'instant yeast', 'yeast'], gramsPerMilliliter: 0.64 },
+  { names: ['baking powder'], gramsPerMilliliter: 0.92 },
+  { names: ['baking soda', 'bicarbonate of soda'], gramsPerMilliliter: 0.92 },
+  { names: ['cornstarch', 'corn starch'], gramsPerMilliliter: 0.54 },
+  { names: ['chocolate chips', 'chopped chocolate', 'chocolate'], gramsPerMilliliter: 0.718 },
+  { names: ['raisins', 'dried cranberries', 'dried fruit'], gramsPerMilliliter: 0.62 },
+  { names: ['chopped nuts', 'walnuts', 'pecans', 'almonds', 'nuts'], gramsPerMilliliter: 0.51 },
+  { names: ['breadcrumbs', 'bread crumbs'], gramsPerMilliliter: 0.46 },
+]);
+
+const normalizedIngredientName = (value) => (value || '').toString().toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ').trim();
+const ingredientDensityAliases = INGREDIENT_DENSITIES
+  .flatMap((entry) => entry.names.map((name) => ({ ...entry, name: normalizedIngredientName(name) })))
+  .sort((left, right) => right.name.length - left.name.length);
+
+export const getIngredientDensity = (ingredientName) => {
+  const name = normalizedIngredientName(ingredientName);
+  if (!name) return null;
+  const match = ingredientDensityAliases.find(({ name: alias }) =>
+    new RegExp(`(?:^| )${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: |$)`).test(name));
+  return match?.gramsPerMilliliter ?? null;
+};
+
+// Converts between weight and volume only when the named ingredient has a
+// density in the list above.  Same-dimension conversion remains convertUnit.
+export const convertIngredientUnit = (quantity, fromValue, toValue, ingredientName) => {
+  const from = getUnit(fromValue);
+  const to = getUnit(toValue);
+  const amount = Number(quantity);
+  if (!from || !to || !Number.isFinite(amount) || !from.conversion || !to.conversion) return null;
+  if (from.dimension === to.dimension) return (amount * from.conversion.factor) / to.conversion.factor;
+  const density = getIngredientDensity(ingredientName);
+  if (!density || !['mass', 'volume'].includes(from.dimension) || !['mass', 'volume'].includes(to.dimension)) return null;
+  const grams = from.dimension === 'mass'
+    ? amount * from.conversion.factor
+    : amount * from.conversion.factor * density;
+  return to.dimension === 'mass' ? grams / to.conversion.factor : grams / density / to.conversion.factor;
+};
+
 const cleanUnit = (value) => (value || '').toString().trim().replace(/\./g, '').toLowerCase();
 const unitLookup = new Map();
 

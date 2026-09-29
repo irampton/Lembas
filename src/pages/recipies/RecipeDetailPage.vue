@@ -127,7 +127,7 @@
                       <ChevronDoubleRightIcon class="size-5" />
                     </button>
                   </div>
-                  <BaseSplitButton v-model="unitSystem" :options="unitSystemOptions" color-type="action"
+                  <BaseSplitButton v-model="selectedUnitSystem" :options="unitSystemOptions" color-type="action"
                     class="[&>button]:h-7 [&>button]:px-2 [&>button]:text-xs" aria-label="Measurement system" />
                 </div>
                 <div>
@@ -145,6 +145,8 @@
                     </div>
                     <div class="md:min-w-30">
                       <RecipeIngredientHover :quantity="hoverQuantity(ingredient)" :unit="ingredient.unit"
+                        :ingredient-name="ingredient.name"
+                        :unit-system="selectedUnitSystem"
                         :written-unit="formatUnit(ingredient.unit, hoverQuantity(ingredient))" side-placement
                         use-pointer>
                         <span class="text-left text-base-dark">{{ ingredient.name }}</span>
@@ -172,6 +174,8 @@
                         :key="`step-${index}-part-${partIndex}`">
                         <RecipeIngredientHover v-if="part.ingredient" :quantity="hoverQuantity(part.ingredient)"
                           :unit="part.ingredient.unit"
+                          :ingredient-name="part.ingredient.name"
+                          :unit-system="selectedUnitSystem"
                           :written-unit="formatUnit(part.ingredient.unit, hoverQuantity(part.ingredient))"
                           show-when-empty>
                           <span class="text-accent">{{ part.text }}</span>
@@ -327,7 +331,7 @@ import BaseTextArea from "../../baseComponents/BaseTextArea.vue";
 import RecipeIngredientHover from "../../shared/RecipeIngredientHover.vue";
 import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
-import { formatMilliliters, formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
+import { convertIngredientUnit, formatMilliliters, formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
 
 const store = useRecipeStore();
 const auth = useAuthStore();
@@ -365,10 +369,14 @@ const customMultiplier = ref(null);
 const editingMultiplier = ref(false);
 const multiplierInput = ref("");
 const multiplierInputElement = ref(null);
-const unitSystem = ref("customary");
+// null preserves a mixed recipe exactly as written.  A chosen mode then
+// standardizes every ingredient for which the conversion is meaningful.
+const unitSystem = ref(null);
 const unitSystemOptions = Object.freeze([
-  { value: "customary", label: "C" },
-  { value: "metric", label: "mL" },
+  { value: "customary-volume", label: "C" },
+  { value: "customary-mass", label: "Oz" },
+  { value: "metric-volume", label: "mL" },
+  { value: "metric-mass", label: "g" },
 ]);
 const isShareRoute = computed(() => route.name === "recipe-share-view");
 const shareToken = computed(() => route.params.token);
@@ -378,6 +386,24 @@ const recipe = computed(() =>
     ? sharedRecipe.value
     : store.getRecipeById(route.params.id),
 );
+const modeForIngredientUnit = (unitValue) => {
+  const definition = getUnit(unitValue);
+  if (!definition?.conversion || !['mass', 'volume'].includes(definition.dimension)) return null;
+  const customary = ['oz', 'lb', 'tsp', 'tbsp', 'fl oz', 'cup', 'pt', 'qt', 'gal'].includes(definition.value);
+  if (!customary && !['mg', 'g', 'kg', 'ml', 'cl', 'dl', 'l'].includes(definition.value)) return null;
+  return `${customary ? 'customary' : 'metric'}-${definition.dimension === 'mass' ? 'mass' : 'volume'}`;
+};
+const detectedUnitSystem = computed(() => {
+  const modes = (recipe.value?.ingredients || [])
+    .filter((ingredient) => Number.isFinite(parseQuantity(ingredient?.quantity)))
+    .map((ingredient) => modeForIngredientUnit(ingredient?.unit))
+    .filter(Boolean);
+  return modes.length && modes.every((mode) => mode === modes[0]) ? modes[0] : null;
+});
+const selectedUnitSystem = computed({
+  get: () => unitSystem.value || detectedUnitSystem.value || '',
+  set: (mode) => { unitSystem.value = mode; },
+});
 const canEditRecipe = computed(
   () => !isShareRoute.value && recipe.value?.canEdit !== false,
 );
@@ -748,7 +774,7 @@ const formatMetricQuantity = (amount, unit) => {
 const readableCustomaryUnit = (amount, dimension) => {
   if (dimension === "volume") return readableVolume(amount);
   if (dimension === "mass") {
-    return amount >= 453.59237 ? ["lb", 453.59237] : amount >= 28.349523125 ? ["oz", 28.349523125] : ["g", 1];
+    return amount >= 453.59237 ? ["lb", 453.59237] : ["oz", 28.349523125];
   }
   if (dimension === "length") return amount >= 25.4 ? ["in", 25.4] : ["mm", 1];
   return null;
@@ -763,27 +789,33 @@ const readableMetricUnit = (amount, dimension) => {
 
 const scaledIngredient = (ingredient) => {
   const original = ingredient.quantity?.toString?.().trim() || "";
-  if (multiplier.value === 1 && unitSystem.value === "customary") {
+  const mode = unitSystem.value || detectedUnitSystem.value;
+  if (multiplier.value === 1 && !mode) {
     return { quantity: original, unit: formatUnit(ingredient.unit, original) };
   }
   const amount = parseQuantity(original);
   if (!Number.isFinite(amount)) return { quantity: original, unit: formatUnit(ingredient.unit, original) };
   const scaledAmount = amount * multiplier.value;
   const definition = getUnit(ingredient.unit);
-  if (definition?.conversion) {
-    const baseAmount = scaledAmount * definition.conversion.factor;
-    const target = unitSystem.value === "metric"
-      ? readableMetricUnit(baseAmount, definition.dimension)
-      : readableCustomaryUnit(baseAmount, definition.dimension);
+  if (definition?.conversion && mode) {
+    const targetDimension = mode.endsWith("-mass") ? "mass" : "volume";
+    const metric = mode.startsWith("metric");
+    const baseUnit = targetDimension === "mass" ? "g" : "ml";
+    const baseAmount = convertIngredientUnit(scaledAmount, ingredient.unit, baseUnit, ingredient.name);
+    const target = Number.isFinite(baseAmount)
+      ? metric
+        ? readableMetricUnit(baseAmount, targetDimension)
+        : readableCustomaryUnit(baseAmount, targetDimension)
+      : null;
     if (!target) {
       const quantity = formatQuantity(scaledAmount);
       return { quantity, unit: formatUnit(ingredient.unit, quantity) };
     }
     const [unit, factor] = target;
     const convertedAmount = baseAmount / factor;
-    const quantity = unitSystem.value === "metric"
+    const quantity = metric
       ? formatMetricQuantity(convertedAmount, unit)
-      : unitSystem.value === "customary" && definition.dimension === "volume"
+      : targetDimension === "volume"
         ? formatCustomaryVolume(convertedAmount, unit)
         : formatQuantity(convertedAmount);
     return { quantity, unit: formatUnit(unit, quantity) };

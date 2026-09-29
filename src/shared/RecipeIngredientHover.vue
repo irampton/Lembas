@@ -8,8 +8,8 @@
         ? 'absolute right-full top-0 z-20 -mt-3 mr-2 w-max whitespace-nowrap text-left text-sm'
         : 'absolute left-0 top-full z-20 mt-2 w-max whitespace-nowrap text-left text-sm'"
     >
-      <div class="font-semibold text-base-dark">{{ writtenAmount }}</div>
-      <div v-for="conversion in conversions" :key="conversion.unit" class="text-light">
+      <div class="font-semibold text-base-dark">{{ primaryAmount }}</div>
+      <div v-for="conversion in allConversions" :key="conversion.unit" class="text-light">
         {{ conversion.amount }} {{ conversion.label }}
       </div>
     </BaseFloatingBox>
@@ -19,12 +19,14 @@
 <script setup>
 import { computed, ref } from "vue";
 import BaseFloatingBox from "../baseComponents/BaseFloatingBox.vue";
-import { formatMilliliters, getUnit, parseQuantity } from "../mixins/units.js";
+import { convertIngredientUnit, formatMilliliters, getIngredientDensity, getUnit, parseQuantity } from "../mixins/units.js";
 
 const props = defineProps({
   quantity: { type: [String, Number], default: "" },
   unit: { type: String, default: "" },
   writtenUnit: { type: String, default: "" },
+  ingredientName: { type: String, default: "" },
+  unitSystem: { type: String, default: "" },
   sidePlacement: { type: Boolean, default: false },
   showWhenEmpty: { type: Boolean, default: false },
   usePointer: { type: Boolean, default: false },
@@ -86,13 +88,124 @@ const conversions = computed(() => {
       const convertedAmount = (amount.value * definition.value.conversion.factor) / target.conversion.factor;
       return {
         unit,
+        targetUnit: unit,
         label,
+        dimension: target.dimension,
+        system: customaryUnits.has(target.value) ? "customary" : "metric",
         amount: unit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
         convertedAmount,
       };
     })
     .filter(({ convertedAmount }) => convertedAmount >= 1 / 8);
 });
-const hasConversions = computed(() => conversions.value.length > 0);
+const massVolumeConversions = computed(() => {
+  if (!definition.value?.conversion || !Number.isFinite(amount.value) || !getIngredientDensity(props.ingredientName)) return [];
+  const isVolume = definition.value.dimension === "volume";
+  const targets = isVolume
+    ? [{ unit: "oz", label: "oz" }, { unit: "lb", label: "lb" }, { unit: "g", label: "g" }]
+    : [{ unit: "cup", label: "cup" }, { unit: "ml", label: "mL" }];
+  return targets.map(({ unit, label }) => {
+    const convertedAmount = convertIngredientUnit(amount.value, definition.value.value, unit, props.ingredientName);
+    return {
+      unit: `mass-volume-${unit}`,
+      targetUnit: unit,
+      label,
+      dimension: getUnit(unit).dimension,
+      system: customaryUnits.has(unit) ? "customary" : "metric",
+      amount: unit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
+      convertedAmount,
+    };
+  }).filter(({ convertedAmount }) => Number.isFinite(convertedAmount) && convertedAmount >= 1 / 8);
+});
+const customaryUnits = new Set(["tsp", "tbsp", "cup", "pt", "qt", "gal", "fl oz", "lb", "oz"]);
+const selectorTargets = Object.freeze({
+  "customary-volume": "cup",
+  "customary-mass": "oz",
+  "metric-volume": "ml",
+  "metric-mass": "g",
+});
+const selectorConversion = computed(() => {
+  let targetUnit = selectorTargets[props.unitSystem];
+  if (!targetUnit || !definition.value?.conversion || !Number.isFinite(amount.value)) return null;
+  let convertedAmount = convertIngredientUnit(amount.value, definition.value.value, targetUnit, props.ingredientName);
+  if (!Number.isFinite(convertedAmount)) return null;
+  // The metric buttons use their larger familiar unit for substantial amounts;
+  // customary weight does the same once the result reaches a pound.
+  if ((targetUnit === "ml" && convertedAmount > 1500) || (targetUnit === "g" && convertedAmount > 1500)) {
+    targetUnit = targetUnit === "ml" ? "l" : "kg";
+    convertedAmount = convertIngredientUnit(amount.value, definition.value.value, targetUnit, props.ingredientName);
+  } else if (targetUnit === "oz" && convertedAmount > 16) {
+    targetUnit = "lb";
+    convertedAmount = convertIngredientUnit(amount.value, definition.value.value, targetUnit, props.ingredientName);
+  }
+  const target = getUnit(targetUnit);
+  return {
+    unit: `selected-${targetUnit}`,
+    targetUnit,
+    label: target.abbreviation,
+    dimension: target.dimension,
+    system: customaryUnits.has(targetUnit) ? "customary" : "metric",
+    amount: targetUnit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
+    convertedAmount,
+    selected: true,
+  };
+});
+const primaryAmount = computed(() => selectorConversion.value
+  ? `${selectorConversion.value.amount} ${selectorConversion.value.label}`
+  : writtenAmount.value);
+const originalUnitConversion = computed(() => {
+  // The source measurement is represented by the heading when no mode is
+  // selected. Once a mode is selected, retain it in its natural group unless
+  // the heading already represents that exact unit.
+  if (!props.unitSystem || !definition.value?.conversion || !Number.isFinite(amount.value)
+    || !['mass', 'volume'].includes(definition.value.dimension)) return null;
+  return {
+    unit: `original-${definition.value.value}`,
+    targetUnit: definition.value.value,
+    label: definition.value.abbreviation,
+    dimension: definition.value.dimension,
+    system: customaryUnits.has(definition.value.value) ? "customary" : "metric",
+    amount: definition.value.value === "ml" ? formatMilliliters(amount.value) : formatAmount(amount.value),
+    convertedAmount: amount.value,
+  };
+});
+const primarySystem = computed(() => {
+  if (props.unitSystem.startsWith("customary")) return "customary";
+  if (props.unitSystem.startsWith("metric")) return "metric";
+  return customaryUnits.has(definition.value?.value) ? "customary" : "metric";
+});
+const allConversions = computed(() => {
+  const primaryDimension = definition.value?.dimension;
+  const secondaryDimension = primaryDimension === "volume" ? "mass" : "volume";
+  const systems = primarySystem.value === "customary"
+    ? ["customary", "metric"]
+    : ["metric", "customary"];
+  const order = new Map(systems.flatMap((system) => [
+    `${system}-${primaryDimension}`,
+    `${system}-${secondaryDimension}`,
+  ]).map((key, index) => [key, index]));
+  const candidates = [...conversions.value, ...massVolumeConversions.value, originalUnitConversion.value].filter(Boolean);
+  const uniqueTargets = new Set();
+  return candidates
+    .sort((left, right) =>
+      (order.get(`${left.system}-${left.dimension}`) ?? 99) -
+      (order.get(`${right.system}-${right.dimension}`) ?? 99))
+    .filter((conversion) => {
+      // The bold heading is the active selector's conversion, so never repeat
+      // that exact unit in the detail list.
+      if (selectorConversion.value && conversion.targetUnit === selectorConversion.value.targetUnit) return false;
+      // When the heading promotes mL/g to L/kg, it still represents the
+      // selector's metric volume/weight result rather than another category.
+      if (selectorConversion.value?.targetUnit === "l" && conversion.targetUnit === "ml") return false;
+      if (selectorConversion.value?.targetUnit === "kg" && conversion.targetUnit === "g") return false;
+      // In ounce mode the heading is the customary-weight reference; pounds
+      // are only useful beneath it when the heading itself has promoted to lb.
+      if (selectorConversion.value?.targetUnit === "oz" && conversion.targetUnit === "lb") return false;
+      if (uniqueTargets.has(conversion.targetUnit)) return false;
+      uniqueTargets.add(conversion.targetUnit);
+      return true;
+    });
+});
+const hasConversions = computed(() => allConversions.value.length > 0);
 const canOpen = computed(() => hasConversions.value || props.showWhenEmpty);
 </script>
