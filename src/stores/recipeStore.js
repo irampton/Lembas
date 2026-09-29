@@ -96,6 +96,11 @@ socket.on('library:updated', (payload) => {
 
 socket.on('recipe:updated', applyRecipe);
 socket.on('recipe:removed', ({ id } = {}) => removeRecipe(id));
+socket.on('recipe:pairing-updated', ({ recipeIds = [] } = {}) => {
+  recipeIds.forEach((id) => {
+    if (state.recipeDetails[id]) loadRecipe(id, { force: true }).catch(() => {});
+  });
+});
 
 socket.on('connect', () => {
   if (!state.ready) {
@@ -180,6 +185,32 @@ const deleteRecipe = (id) =>
     });
   });
 
+const addRecipePairing = (recipeId, pairedRecipeId) =>
+  new Promise((resolve, reject) => {
+    socket.emit('recipe:pair', { recipeId, pairedRecipeId }, (response) => {
+      if (response?.success) {
+        Promise.all([loadRecipe(recipeId, { force: true }), loadRecipe(pairedRecipeId, { force: true })])
+          .then(() => resolve(true))
+          .catch(reject);
+      } else {
+        reject(new Error(response?.error || 'Unable to add recipe pairing.'));
+      }
+    });
+  });
+
+const removeRecipePairing = (recipeId, pairedRecipeId) =>
+  new Promise((resolve, reject) => {
+    socket.emit('recipe:unpair', { recipeId, pairedRecipeId }, (response) => {
+      if (response?.success) {
+        Promise.all([loadRecipe(recipeId, { force: true }), loadRecipe(pairedRecipeId, { force: true })])
+          .then(() => resolve(true))
+          .catch(reject);
+      } else {
+        reject(new Error(response?.error || 'Unable to remove recipe pairing.'));
+      }
+    });
+  });
+
 const saveCookbook = async (cookbook) => {
   const isEditing = Boolean(cookbook.id);
   const res = await fetch(isEditing ? `/api/cookbooks/${cookbook.id}` : '/api/cookbooks', {
@@ -251,6 +282,8 @@ export const useRecipeStore = () => ({
   loadRecipe,
   saveRecipe,
   deleteRecipe,
+  addRecipePairing,
+  removeRecipePairing,
   saveCookbook,
   reorderCookbooks,
   deleteCookbook,

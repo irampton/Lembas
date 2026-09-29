@@ -1053,6 +1053,64 @@ io.on("connection", (socket) => {
     reply({ success: true });
     setImmediate(() => emitRecipeRemoval(recipe));
   });
+
+  socket.on("recipe:pair", ({ recipeId, pairedRecipeId } = {}, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    if (!recipeId || !pairedRecipeId || recipeId === pairedRecipeId) {
+      reply({ success: false, error: "Choose a different recipe to pair." });
+      return;
+    }
+    const recipe = db.getRecipeForUser(recipeId, user.id);
+    const pairedRecipe = db.getRecipeForUser(pairedRecipeId, user.id);
+    if (!recipe || !pairedRecipe) {
+      reply({ success: false, error: "Recipe not found." });
+      return;
+    }
+    if (!db.isCookbookEditor(recipe.cookbookId, user.id)) {
+      reply({ success: false, error: "You do not have permission to add pairings to this recipe." });
+      return;
+    }
+    db.addRecipePairing(recipeId, pairedRecipeId);
+    reply({ success: true });
+    setImmediate(() => {
+      const memberIds = new Set([
+        ...db.listCookbookMemberIds(recipe.cookbookId),
+        ...db.listCookbookMemberIds(pairedRecipe.cookbookId),
+      ]);
+      memberIds.forEach((memberId) => {
+        io.to(`user:${memberId}`).emit("recipe:pairing-updated", { recipeIds: [recipeId, pairedRecipeId] });
+      });
+    });
+  });
+
+  socket.on("recipe:unpair", ({ recipeId, pairedRecipeId } = {}, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    if (!recipeId || !pairedRecipeId || recipeId === pairedRecipeId) {
+      reply({ success: false, error: "Invalid recipe pairing." });
+      return;
+    }
+    const recipe = db.getRecipeForUser(recipeId, user.id);
+    const pairedRecipe = db.getRecipeForUser(pairedRecipeId, user.id);
+    if (!recipe || !pairedRecipe) {
+      reply({ success: false, error: "Recipe not found." });
+      return;
+    }
+    if (!db.isCookbookEditor(recipe.cookbookId, user.id)) {
+      reply({ success: false, error: "You do not have permission to remove pairings from this recipe." });
+      return;
+    }
+    db.removeRecipePairing(recipeId, pairedRecipeId);
+    reply({ success: true });
+    setImmediate(() => {
+      const memberIds = new Set([
+        ...db.listCookbookMemberIds(recipe.cookbookId),
+        ...db.listCookbookMemberIds(pairedRecipe.cookbookId),
+      ]);
+      memberIds.forEach((memberId) => {
+        io.to(`user:${memberId}`).emit("recipe:pairing-updated", { recipeIds: [recipeId, pairedRecipeId] });
+      });
+    });
+  });
 });
 
 app.get("/{*splat}", (req, res) => {

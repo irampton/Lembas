@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 md:px-[20%]">
+  <div class="p-4 md:px-[15%]">
     <div v-if="!isShareRoute && ((store.state.loading && !store.state.ready) || detailLoading)">
       Loading recipe…
     </div>
@@ -18,147 +18,144 @@
     </div>
 
     <div v-else>
-      <div class="flex flex-row justify-between md:mx-5">
-        <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
-        <div class="flex flex-row items-center text-right md:mt-1 text-accent">
-          <div v-if="!isShareRoute && recipeCookbook" class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold"
-            :style="cookbookPillStyle" :title="recipeCookbook.name">
-            {{ recipeCookbook.name }}
-          </div>
-          <button
-            v-if="isShareRoute && auth.state.user"
-            type="button"
-            class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-alt"
-            @click="addToMyRecipes"
-          >
-            Add to my recipes
-          </button>
-          <div v-if="!isShareRoute" class="rounded-xl p-1 hover:bg-base-alt">
-            <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
-              aria-label="Edit recipe">
-              <PencilIcon class="size-6 md:size-8" />
-            </RouterLink>
-          </div>
-          <div v-if="canManageShare" class="relative">
-            <button
-              type="button"
-              class="rounded-xl p-1 hover:bg-base-alt"
-              aria-label="Share recipe"
-              :aria-expanded="shareMenuOpen"
-              @click.stop="toggleShareMenu"
-            >
-              <ArrowUpOnSquareIcon class="size-6 md:size-8" />
-            </button>
-            <BaseFloatingBox
-              v-if="shareMenuOpen"
-              class="absolute right-0 top-full z-10 mt-2 w-80 text-left"
-              @clickaway="shareMenuOpen = false"
-            >
-              <div class="flex items-center justify-between gap-4">
-                <span class="font-semibold text-base-dark">Anyone can view</span>
-                <BaseToggle
-                  :model-value="publicShareEnabled"
-                  :disabled="shareSaving"
-                  aria-label="Allow anyone with the link to view this recipe"
-                  @update:model-value="setPublicShare"
-                />
-              </div>
-              <template v-if="publicShareEnabled && shareLink">
-                <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-share-link">Share link</label>
-                <div class="mt-1 flex gap-2">
-                  <input id="recipe-share-link" :value="shareLink" readonly class="min-w-0 grow rounded-lg border border-primary-alt bg-base-alt px-2 py-1 text-sm text-base-dark" />
-                  <button type="button" class="rounded-lg bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-alt" @click="copyShareLink">
-                    {{ linkCopied ? 'Copied' : 'Copy' }}
-                  </button>
-                </div>
-              </template>
-              <p v-if="shareSettingsError" class="mt-3 text-sm text-error" role="alert">{{ shareSettingsError }}</p>
-            </BaseFloatingBox>
-          </div>
-        </div>
-      </div>
-      <div class="text-light pb-1 pl-px pt-px md:ml-5">
-        <span v-if="recipe.author">{{ recipe.author }}</span>
-        <span v-if="recipe.author && formattedDate"> • </span>
-        <span v-if="formattedDate">{{ formattedDate }}</span>
-        <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
-        <span v-if="servingSize">{{ servingSize }}</span>
-      </div>
 
       <div class="flex flex-col md:flex-row">
-        <div class="md:w-fit md:pr-2">
-          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
-            <div class="font-bold text-base-dark text-3xl pb-2">
-              Ingredients
-            </div>
-            <div class="flex items-center justify-between gap-3 pb-3 text-accent" aria-label="Recipe quantity">
-              <div class="flex flex-row items-center">
-                <button type="button" class="rounded-lg p-1 hover:bg-base" :disabled="multiplierIndex === 0"
-                  aria-label="Decrease recipe quantity" @click="decreaseMultiplier">
-                  <ChevronDoubleLeftIcon class="size-5" />
-                </button>
-                <span class="min-w-10 text-center font-bold text-base-dark" aria-live="polite">
-                  {{ multiplierLabel }}
-                </span>
-                <button type="button" class="rounded-lg p-1 hover:bg-base"
-                  :disabled="multiplierIndex === MULTIPLIERS.length - 1" aria-label="Increase recipe quantity"
-                  @click="increaseMultiplier">
-                  <ChevronDoubleRightIcon class="size-5" />
-                </button>
-              </div>
-              <BaseSplitButton v-model="unitSystem" :options="unitSystemOptions" color-type="action"
-                class="[&>button]:h-7 [&>button]:px-2 [&>button]:text-xs" aria-label="Measurement system" />
-            </div>
-            <div>
-              <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index"
-                class="flex flex-row">
-                <div class="w-10 shrink-0 text-right mr-1">
-                  <span class="text-light">{{
-                    scaledIngredient(ingredient).quantity
-                  }}</span>
-                </div>
-                <div class="w-10 shrink-0 text-left mr-3">
-                  <span class="text-light">{{
-                    scaledIngredient(ingredient).unit || "&nbsp;"
-                  }}</span>
-                </div>
-                <div class="md:min-w-30">
-                  <span class="text-left text-base-dark">{{
-                    ingredient.name
-                  }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div>
 
-        <div class="w-full">
-          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
-            <div class="font-bold text-base-dark text-3xl pb-3 md:pb-2">
-              Steps
+          <div class="flex flex-row justify-between md:mx-5">
+            <div class="font-bold text-base-dark text-4xl">{{ recipe.title }}</div>
+            <div class="flex flex-row items-center text-right md:mt-1 text-accent">
+              <div v-if="!isShareRoute && recipeCookbook"
+                class="mr-1 max-w-48 truncate rounded-full px-3 py-1 text-sm font-bold" :style="cookbookPillStyle"
+                :title="recipeCookbook.name">
+                {{ recipeCookbook.name }}
+              </div>
+              <button v-if="isShareRoute && auth.state.user" type="button"
+                class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-alt"
+                @click="addToMyRecipes">
+                Add to my recipes
+              </button>
+              <div v-if="!isShareRoute" class="rounded-xl p-1 hover:bg-base-alt">
+                <RouterLink v-if="canEditRecipe" :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
+                  aria-label="Edit recipe">
+                  <PencilIcon class="size-6 md:size-8" />
+                </RouterLink>
+              </div>
+              <div v-if="canManageShare" class="relative">
+                <button type="button" class="rounded-xl p-1 hover:bg-base-alt" aria-label="Share recipe"
+                  :aria-expanded="shareMenuOpen" @click.stop="toggleShareMenu">
+                  <ArrowUpOnSquareIcon class="size-6 md:size-8" />
+                </button>
+                <BaseFloatingBox v-if="shareMenuOpen" class="absolute right-0 top-full z-10 mt-2 w-80 text-left"
+                  @clickaway="shareMenuOpen = false">
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="font-semibold text-base-dark">Anyone can view</span>
+                    <BaseToggle :model-value="publicShareEnabled" :disabled="shareSaving"
+                      aria-label="Allow anyone with the link to view this recipe"
+                      @update:model-value="setPublicShare" />
+                  </div>
+                  <template v-if="publicShareEnabled && shareLink">
+                    <label class="mt-4 block text-sm font-semibold text-base-dark" for="recipe-share-link">Share
+                      link</label>
+                    <div class="mt-1 flex gap-2">
+                      <input id="recipe-share-link" :value="shareLink" readonly
+                        class="min-w-0 grow rounded-lg border border-primary-alt bg-base-alt px-2 py-1 text-sm text-base-dark" />
+                      <button type="button"
+                        class="rounded-lg bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-alt"
+                        @click="copyShareLink">
+                        {{ linkCopied ? 'Copied' : 'Copy' }}
+                      </button>
+                    </div>
+                  </template>
+                  <p v-if="shareSettingsError" class="mt-3 text-sm text-error" role="alert">{{ shareSettingsError }}</p>
+                </BaseFloatingBox>
+              </div>
             </div>
-            <div v-for="(stepText, index) in recipe.steps" :key="`step-${index}`">
-              <div class="flex flex-row my-2">
-                <div
-                  class="border-solid border-2 border-accent rounded-4xl text-lg font-bold w-8 h-8 text-center p-0 text-accent shrink-0"
-                  :style="stepNumberStyle">
-                  {{ index + 1 }}
+          </div>
+          <div class="text-light pb-1 pl-px pt-px md:ml-5">
+            <span v-if="recipe.author">{{ recipe.author }}</span>
+            <span v-if="recipe.author && formattedDate"> • </span>
+            <span v-if="formattedDate">{{ formattedDate }}</span>
+            <span v-if="(recipe.author || formattedDate) && servingSize"> • </span>
+            <span v-if="servingSize">{{ servingSize }}</span>
+          </div>
+
+          <div class="flex flex-col md:flex-row">
+            <div class="md:w-fit md:pr-2">
+              <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+                <div class="font-bold text-base-dark text-3xl pb-2">
+                  Ingredients
                 </div>
-                <div class="ml-2 mt-[2.5px] grow">
-                  {{ stepText }}
+                <div class="flex items-center justify-between gap-3 pb-3 text-accent" aria-label="Recipe quantity">
+                  <div class="flex flex-row items-center">
+                    <button type="button" class="rounded-lg p-1 hover:bg-base" :disabled="multiplierIndex === 0"
+                      aria-label="Decrease recipe quantity" @click="decreaseMultiplier">
+                      <ChevronDoubleLeftIcon class="size-5" />
+                    </button>
+                    <span class="min-w-10 text-center font-bold text-base-dark" aria-live="polite">
+                      {{ multiplierLabel }}
+                    </span>
+                    <button type="button" class="rounded-lg p-1 hover:bg-base"
+                      :disabled="multiplierIndex === MULTIPLIERS.length - 1" aria-label="Increase recipe quantity"
+                      @click="increaseMultiplier">
+                      <ChevronDoubleRightIcon class="size-5" />
+                    </button>
+                  </div>
+                  <BaseSplitButton v-model="unitSystem" :options="unitSystemOptions" color-type="action"
+                    class="[&>button]:h-7 [&>button]:px-2 [&>button]:text-xs" aria-label="Measurement system" />
+                </div>
+                <div>
+                  <div v-for="(ingredient, index) in recipe.ingredients" :key="ingredient.id || index"
+                    class="flex flex-row">
+                    <div class="w-10 shrink-0 text-right mr-1">
+                      <span class="text-light">{{
+                        scaledIngredient(ingredient).quantity
+                      }}</span>
+                    </div>
+                    <div class="w-10 shrink-0 text-left mr-3">
+                      <span class="text-light">{{
+                        scaledIngredient(ingredient).unit || "&nbsp;"
+                      }}</span>
+                    </div>
+                    <div class="md:min-w-30">
+                      <span class="text-left text-base-dark">{{
+                        ingredient.name
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="w-full">
+              <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+                <div class="font-bold text-base-dark text-3xl pb-3 md:pb-2">
+                  Steps
+                </div>
+                <div v-for="(stepText, index) in recipe.steps" :key="`step-${index}`">
+                  <div class="flex flex-row my-2">
+                    <div
+                      class="border-solid border-2 border-accent rounded-4xl text-lg font-bold w-8 h-8 text-center p-0 text-accent shrink-0"
+                      :style="stepNumberStyle">
+                      {{ index + 1 }}
+                    </div>
+                    <div class="ml-2 mt-[2.5px] grow">
+                      {{ stepText }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      <div v-if="hasNotes">
-        <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
-          <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
-          {{ recipe.notes }}
-        </div>
-      </div>
-      <!--
+
+          <div v-if="hasNotes">
+            <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+              <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
+              {{ recipe.notes }}
+            </div>
+          </div>
+
+          <!--
       <div>
         <div class="font-bold text-base-dark text-3xl py-3">Makes</div>
       </div>
@@ -166,24 +163,71 @@
         <div class="font-bold text-base-dark text-3xl py-3">History</div>
       </div>
       -->
-      <div v-if="hasTags">
-        <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 md:mt-4 m-2">
-          <div class="flex flex-row flex-wrap gap-2">
-            <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
-              {{ tag }}
-            </BaseTag>
+          <div v-if="hasTags">
+            <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 md:mt-4 m-2">
+              <div class="flex flex-row flex-wrap gap-2">
+                <BaseTag v-for="(tag, index) in recipe.tags" :key="`${tag}-${index}`">
+                  {{ tag }}
+                </BaseTag>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="md:w-1/5 md:mt-18">
+          <div class="bg-base-alt rounded-2xl drop-shadow-lg p-4 m-2">
+            <div class="flex flex-row justify-between items-center">
+              <div class="font-bold text-base-dark text-xl">
+                Parings
+              </div>
+              <button v-if="canEditRecipe" type="button" class="rounded-lg p-1 text-accent hover:bg-base"
+                aria-label="Add a paired recipe" :aria-expanded="pairingPickerOpen" @click="togglePairingPicker">
+                <PlusIcon class="size-6 text-accent" />
+              </button>
+            </div>
+            <BaseAutocomplete v-if="pairingPickerOpen" v-model="pairingQuery" :options="pairingOptions"
+              class="mt-3" placeholder="Search recipes" aria-label="Search recipes to pair" :disabled="pairingSaving"
+              @commit="selectPairing" />
+            <p v-if="pairingError" class="mt-2 text-sm text-error" role="alert">{{ pairingError }}</p>
+            <ul v-if="recipe.pairings?.length" class="mt-3 space-y-1">
+              <li v-for="pairedRecipe in recipe.pairings" :key="pairedRecipe.id">
+                <div class="group flex items-center rounded-lg hover:bg-base">
+                  <RouterLink :to="{ name: 'recipe-detail', params: { id: pairedRecipe.id } }"
+                    class="min-w-0 grow truncate px-2 py-1 text-accent" :title="pairedRecipe.title">
+                    {{ pairedRecipe.title }}
+                  </RouterLink>
+                  <button v-if="canEditRecipe" type="button"
+                    class="mr-1 rounded p-1 text-light opacity-0 transition-opacity hover:bg-base-alt hover:text-error focus:opacity-100 group-hover:opacity-100"
+                    :aria-label="`Remove ${pairedRecipe.title} pairing`" :title="`Remove ${pairedRecipe.title} pairing`"
+                    @click="openPairingRemoval(pairedRecipe)">
+                    <XMarkIcon class="size-4" />
+                  </button>
+                </div>
+              </li>
+            </ul>
           </div>
         </div>
+
       </div>
+
     </div>
+    <BasePopup v-if="pairingToRemove" aria-label="Remove recipe pairing" :buttons="['cancel', 'delete']"
+      :delete-disabled="pairingRemoving" @close="closePairingRemoval" @delete="removePairing">
+      <h2 class="text-2xl font-bold text-base-dark">Remove pairing?</h2>
+      <p class="mt-2">Remove <strong>{{ pairingToRemove.title }}</strong> from this recipe's pairings?</p>
+      <p v-if="pairingRemovalError" class="mt-3 text-sm text-error" role="alert">{{ pairingRemovalError }}</p>
+    </BasePopup>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import { PencilIcon, ArrowUpOnSquareIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from "@heroicons/vue/24/outline";
+import { PencilIcon, ArrowUpOnSquareIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import BaseFloatingBox from "../../baseComponents/BaseFloatingBox.vue";
+import BaseAutocomplete from "../../baseComponents/BaseAutocomplete.vue";
+import BasePopup from "../../baseComponents/BasePopup.vue";
 import BaseTag from "../../baseComponents/BaseTag.vue";
 import BaseSplitButton from "../../baseComponents/BaseSplitButton.vue";
 import BaseToggle from "../../baseComponents/BaseToggle.vue";
@@ -206,6 +250,13 @@ const shareSaving = ref(false);
 const shareSettingsError = ref("");
 const publicShareToken = ref("");
 const linkCopied = ref(false);
+const pairingPickerOpen = ref(false);
+const pairingQuery = ref("");
+const pairingSaving = ref(false);
+const pairingError = ref("");
+const pairingToRemove = ref(null);
+const pairingRemoving = ref(false);
+const pairingRemovalError = ref("");
 const MULTIPLIERS = Object.freeze([1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8]);
 const multiplierIndex = ref(MULTIPLIERS.indexOf(1));
 const unitSystem = ref("customary");
@@ -245,6 +296,12 @@ const recipeCookbook = computed(() =>
     ? store.getCookbookById(recipe.value.cookbookId)
     : null,
 );
+const pairingOptions = computed(() => {
+  const pairedIds = new Set((recipe.value?.pairings || []).map((pairedRecipe) => pairedRecipe.id));
+  return store.state.recipes
+    .filter((candidate) => candidate.id !== recipe.value?.id && !pairedIds.has(candidate.id))
+    .map((candidate) => ({ value: candidate.id, label: candidate.title }));
+});
 const stepNumberStyle = computed(() => {
   const color = recipeCookbook.value?.color;
   return color ? { borderColor: color, color } : {};
@@ -294,6 +351,52 @@ const addToMyRecipes = () => {
 const toggleShareMenu = () => {
   shareMenuOpen.value = !shareMenuOpen.value;
   linkCopied.value = false;
+};
+
+const togglePairingPicker = () => {
+  pairingPickerOpen.value = !pairingPickerOpen.value;
+  pairingQuery.value = "";
+  pairingError.value = "";
+};
+
+const selectPairing = async (pairedRecipeId) => {
+  pairingQuery.value = "";
+  if (!pairedRecipeId || pairingSaving.value || !recipe.value?.id) return;
+  pairingSaving.value = true;
+  pairingError.value = "";
+  try {
+    await store.addRecipePairing(recipe.value.id, pairedRecipeId);
+    pairingPickerOpen.value = false;
+  } catch (error) {
+    pairingError.value = error.message || "Unable to add recipe pairing.";
+  } finally {
+    pairingSaving.value = false;
+  }
+};
+
+const openPairingRemoval = (pairedRecipe) => {
+  pairingToRemove.value = pairedRecipe;
+  pairingRemovalError.value = "";
+};
+
+const closePairingRemoval = () => {
+  if (pairingRemoving.value) return;
+  pairingToRemove.value = null;
+  pairingRemovalError.value = "";
+};
+
+const removePairing = async () => {
+  if (!recipe.value?.id || !pairingToRemove.value || pairingRemoving.value) return;
+  pairingRemoving.value = true;
+  pairingRemovalError.value = "";
+  try {
+    await store.removeRecipePairing(recipe.value.id, pairingToRemove.value.id);
+    pairingToRemove.value = null;
+  } catch (error) {
+    pairingRemovalError.value = error.message || "Unable to remove recipe pairing.";
+  } finally {
+    pairingRemoving.value = false;
+  }
 };
 
 const setPublicShare = async (enabled) => {
@@ -477,7 +580,13 @@ watch(
 
 watch(
   () => route.params.id,
-  () => loadRecipe(),
+  () => {
+    pairingPickerOpen.value = false;
+    pairingQuery.value = "";
+    pairingError.value = "";
+    pairingToRemove.value = null;
+    loadRecipe();
+  },
   { immediate: true },
 );
 

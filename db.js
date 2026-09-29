@@ -137,6 +137,17 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_public_share_unique ON recipe_shares(recipeId) WHERE type = 'public';
   CREATE UNIQUE INDEX IF NOT EXISTS idx_user_share_unique ON recipe_shares(recipeId, userId) WHERE type = 'user';
 
+  CREATE TABLE IF NOT EXISTS recipe_pairings (
+    recipeIdA TEXT NOT NULL,
+    recipeIdB TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    PRIMARY KEY (recipeIdA, recipeIdB),
+    CHECK (recipeIdA < recipeIdB),
+    FOREIGN KEY (recipeIdA) REFERENCES recipes(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipeIdB) REFERENCES recipes(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_recipe_pairings_b ON recipe_pairings(recipeIdB);
+
   CREATE TABLE IF NOT EXISTS friend_requests (
     id TEXT PRIMARY KEY,
     fromUserId TEXT NOT NULL,
@@ -571,7 +582,7 @@ export const createUser = ({ id, username, displayName, passwordHash, role, llmA
   return findUserById(id);
 };
 
-export const getRecipeForUser = (id, userId) => {
+export const getRecipeForUser = (id, userId, { includePairings = true } = {}) => {
   const row = db.prepare(`
     SELECT r.*,
            CASE
@@ -603,7 +614,7 @@ export const getRecipeForUser = (id, userId) => {
       )
   `).get({ id, userId });
   if (!row) return null;
-  return {
+  const recipe = {
     ...rowToRecipe(row),
     canEdit: Boolean(row.userCanEdit),
     canManageCookbook: Boolean(row.userCanManageCookbook),
@@ -613,6 +624,47 @@ export const getRecipeForUser = (id, userId) => {
     // get the recipe itself without gaining control of its public link.
     publicShareToken: row.ownerId === userId ? getPublicShare(id)?.token || "" : "",
   };
+  return {
+    ...recipe,
+    pairings: includePairings ? getRecipePairingsForUser(id, userId) : [],
+  };
+};
+
+const normalizeRecipePair = (firstId, secondId) =>
+  firstId && secondId && firstId !== secondId
+    ? [firstId, secondId].sort()
+    : null;
+
+export const addRecipePairing = (firstId, secondId) => {
+  const pair = normalizeRecipePair(firstId, secondId);
+  if (!pair) return false;
+  db.prepare(`
+    INSERT OR IGNORE INTO recipe_pairings (recipeIdA, recipeIdB, createdAt)
+    VALUES (?, ?, ?)
+  `).run(pair[0], pair[1], new Date().toISOString());
+  return true;
+};
+
+export const removeRecipePairing = (firstId, secondId) => {
+  const pair = normalizeRecipePair(firstId, secondId);
+  if (!pair) return false;
+  const info = db.prepare(`
+    DELETE FROM recipe_pairings WHERE recipeIdA = ? AND recipeIdB = ?
+  `).run(pair[0], pair[1]);
+  return info.changes > 0;
+};
+
+export const getRecipePairingsForUser = (recipeId, userId) => {
+  if (!recipeId || !userId) return [];
+  const rows = db.prepare(`
+    SELECT CASE WHEN recipeIdA = ? THEN recipeIdB ELSE recipeIdA END AS pairedRecipeId
+    FROM recipe_pairings
+    WHERE recipeIdA = ? OR recipeIdB = ?
+  `).all(recipeId, recipeId, recipeId);
+  return rows
+    .map(({ pairedRecipeId }) => getRecipeForUser(pairedRecipeId, userId, { includePairings: false }))
+    .filter(Boolean)
+    .map((recipe) => ({ id: recipe.id, title: recipe.title }));
 };
 
 export const updateUserProfile = (id, { username, displayName }) => {
