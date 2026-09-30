@@ -19,6 +19,9 @@ const usesOpenAiApi = (endpoint) => {
   }
 };
 
+const supportsExplicitPromptCaching = (model) =>
+  /^gpt-(?:5\.(?:[6-9]|[1-9]\d)|[6-9](?:[.-]|$))/i.test((model || "").trim());
+
 const responseText = (data) => {
   if (typeof data?.output_text === "string") return data.output_text;
   return (data?.output || [])
@@ -88,10 +91,21 @@ Field rules:
 - ingredient quantity: Return only the amount as a string. Preserve ranges and mixed numbers. Prefer simple fractions such as "1/2" or "1 1/2". Use an empty string when absent.
 - ingredient unit: Use only one value from this exact list: ${JSON.stringify(UNIT_VALUES)}. Normalize obvious variants to that list. If no listed unit fits, leave unit empty and retain essential measurement wording in the ingredient name.
 - steps: Include every preparation and cooking instruction in source order. Each array item must be a complete, direct instruction. When a step refers to an ingredient, use the exact full name from the ingredients list, including any preparation details; do not shorten, paraphrase, or substitute the ingredient name. Preserve temperatures, durations, visual doneness cues, resting, cooling, and assembly instructions. Do not add step numbers to the text.
-- notes: Collect only source-provided tips, substitutions, storage guidance, make-ahead guidance, optional variations, and other useful information that is not an ingredient or required step. Combine multiple notes into readable plain text.
+- notes: Collect only source-provided tips, substitutions, storage guidance, make-ahead guidance, optional variations, and other useful information that is not an ingredient or required step. Combine multiple notes into readable plain text. If provided with a URL or other source not fit for the author field, put that info into the notes.
 - servingsVerb: Use "Serves" when the yield refers to people or servings. Use "Makes" for item counts, batches, volume, or other yields. Default to "Makes" when no yield is provided.
 - servingsQuantity: Return only the quantity or range, such as "4", "4-6", or "12". Use an empty string when absent.
 - servingsUnit: Return only the yield unit, such as "servings", "people", "cookies", or "cups". Use an empty string when absent.
+- If servingsVerb, servingsQuantity, and/or servingsUnit is not in the recipie, but the quantity is easy to infer, you may use your judgement to fill in these fields.
+
+Extraction safeguards:
+- Read the source from beginning to end before deciding that a field is absent. Recipe pages often put the title, yield, author, notes, or ingredient quantities in separate visual regions.
+- Treat labels, headings, captions, and ingredient-list formatting as source evidence. Do not mistake navigation, advertisements, comments, related-recipe cards, or page boilerplate for recipe content.
+- Preserve distinctions that affect cooking results. For example, do not merge ingredients merely because their base names match when their preparation, amount, or timing differs.
+- When the source gives a choice, variation, or optional item, retain that qualification notes field, selecting the default option for the ingredient name.
+- Reconcile repeated source details carefully. Use the clearest complete version when wording is duplicated, and include a detail only once unless the recipe deliberately calls for it in separate steps.
+- Keep quoted recipe wording faithful where it conveys a technique, temperature, duration, sequence, or doneness cue. Prefer an empty value to a plausible guess.
+- JSON syntax is part of the task: escape quotation marks inside strings, use arrays for repeated items, and return strings rather than numeric values for every requested quantity field.
+- The final object is consumed by recipe software. Exact field names, allowed unit values, source order, and valid JSON are more important than prose polish.
 
 Quality checks before responding:
 - Account for the complete source, including small text and separate regions of an image.
@@ -200,20 +214,36 @@ export const buildRecipeFromText = async (
   { endpoint, apiKey, model, imageBase64 } = {},
 ) => {
   if (!text?.trim() && !imageBase64) throw new Error("No recipe content provided for import.");
+  const selectedModel = model || DEFAULT_MODEL;
   const input = text?.trim()
     ? `Extract the recipe details from this content. Respond with JSON only.\n\n${text.trim()}`
     : "Extract the recipe details from this image. Respond with JSON only.";
   const responsesApi = usesResponsesApi(endpoint);
+  const useExplicitPromptCaching =
+    responsesApi && usesOpenAiApi(endpoint) && supportsExplicitPromptCaching(selectedModel);
   const cacheSettings = usesOpenAiApi(endpoint)
-    ? { prompt_cache_key: PROMPT_CACHE_KEY }
+    ? {
+        prompt_cache_key: PROMPT_CACHE_KEY,
+        ...(useExplicitPromptCaching
+          ? { prompt_cache_options: { mode: "explicit", ttl: "30m" } }
+          : {}),
+      }
     : {};
   const body = responsesApi
     ? {
-        model: model || DEFAULT_MODEL,
+        model: selectedModel,
         input: [
           {
             role: "developer",
-            content: [{ type: "input_text", text: SYSTEM_PROMPT }],
+            content: [
+              {
+                type: "input_text",
+                text: SYSTEM_PROMPT,
+                ...(useExplicitPromptCaching
+                  ? { prompt_cache_breakpoint: { mode: "explicit" } }
+                  : {}),
+              },
+            ],
           },
           {
             role: "user",
@@ -231,7 +261,7 @@ export const buildRecipeFromText = async (
         ...cacheSettings,
       }
     : {
-        model: model || DEFAULT_MODEL,
+        model: selectedModel,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
