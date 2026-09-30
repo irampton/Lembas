@@ -98,10 +98,7 @@
         </div>
       </div>
 
-      <div class="flex flex-col lg:flex-row">
-        <div>
-
-          <div class="flex flex-col lg:flex-row">
+      <div class="flex flex-col lg:flex-row w-full">
             <div class="lg:w-fit lg:pr-2">
               <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
                 <div class="font-bold text-base-dark text-3xl pb-2">
@@ -160,7 +157,7 @@
               </div>
             </div>
 
-            <div class="w-full">
+            <div class="grow">
               <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
                 <div class="font-bold text-base-dark text-3xl pb-3 lg:pb-2">
                   Steps
@@ -190,26 +187,7 @@
                 </div>
               </div>
             </div>
-          </div>
 
-          <div v-if="hasNotes">
-            <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
-              <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
-              {{ recipe.notes }}
-            </div>
-          </div>
-
-          <!--
-      <div>
-        <div class="font-bold text-base-dark text-3xl py-3">Makes</div>
-      </div>
-      <div>
-        <div class="font-bold text-base-dark text-3xl py-3">History</div>
-      </div>
-      -->
-
-
-        </div>
 
         <div class="lg:w-[15vw] shrink-0">
 
@@ -293,7 +271,12 @@
         </div>
 
       </div>
-
+<div v-if="hasNotes">
+            <div class="bg-base-alt rounded-2xl shadow-lg p-4 m-2">
+              <div class="font-bold text-base-dark text-3xl pb-3">Notes</div>
+              {{ recipe.notes }}
+            </div>
+          </div>
     </div>
     <BasePopup v-if="pairingToRemove" aria-label="Remove recipe pairing" :buttons="['cancel', 'delete']"
       :delete-disabled="pairingRemoving" @close="closePairingRemoval" @delete="removePairing">
