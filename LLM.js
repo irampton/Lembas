@@ -209,6 +209,18 @@ const normalizeRecipe = (payload) => {
   };
 };
 
+const hasRecipeContent = (recipe) => Boolean(
+  recipe.title ||
+  recipe.description ||
+  recipe.author ||
+  recipe.tags.length ||
+  recipe.ingredients.length ||
+  recipe.steps.length ||
+  recipe.notes ||
+  recipe.servingsQuantity ||
+  recipe.servingsUnit,
+);
+
 export const buildRecipeFromText = async (
   text,
   { endpoint, apiKey, model, imageBase64 } = {},
@@ -255,7 +267,6 @@ export const buildRecipeFromText = async (
             ],
           },
         ],
-        max_output_tokens: 2000,
         store: false,
         text: { format: { type: "json_object" } },
         ...cacheSettings,
@@ -274,7 +285,6 @@ export const buildRecipeFromText = async (
               : input,
           },
         ],
-        max_tokens: 2000,
         response_format: { type: "json_object" },
         ...cacheSettings,
       };
@@ -284,8 +294,19 @@ export const buildRecipeFromText = async (
     ? responseText(data)
     : data?.choices?.[0]?.message?.content ?? "";
   const parsed = jsonFromText(content);
+  const recipe = normalizeRecipe(parsed);
+  if (!hasRecipeContent(recipe)) {
+    const error = new Error("The LLM returned an empty or invalid recipe.");
+    error.code = "EMPTY_LLM_RECIPE";
+    error.details = {
+      contentLength: content.length,
+      parsedJson: Boolean(Object.keys(parsed).length),
+      responseApi: responsesApi,
+    };
+    throw error;
+  }
   return {
-    recipe: normalizeRecipe(parsed),
+    recipe,
     usage: {
       inputTokens: Number(
         responsesApi ? data?.usage?.input_tokens : data?.usage?.prompt_tokens,

@@ -84,6 +84,17 @@ const settingsLoading = computed(() => settingsStore.state.loading && !settingsS
 const controlsDisabled = computed(() => loading.value || !llmAvailable.value || !settingsReady.value);
 const cookbookId = computed(() => route.query.cookbookId?.toString() || '');
 const newRecipeRoute = computed(() => ({ name: 'recipe-new', query: cookbookId.value ? { cookbookId: cookbookId.value } : {} }));
+const hasRecipeContent = (recipe) => Boolean(
+  recipe?.title ||
+  recipe?.description ||
+  recipe?.author ||
+  recipe?.tags?.length ||
+  recipe?.ingredients?.length ||
+  recipe?.steps?.length ||
+  recipe?.notes ||
+  recipe?.servingsQuantity ||
+  recipe?.servingsUnit,
+);
 
 const clearImage = () => {
   imageData.value = '';
@@ -134,9 +145,19 @@ const submit = async () => {
       text: text.value,
       imageBase64: visionCapable.value ? imageData.value || undefined : undefined,
     });
+    if (!hasRecipeContent(recipe)) {
+      throw new Error('The import returned an empty recipe. Try again with more complete recipe text or a clearer image.');
+    }
     store.setImportedDraft({ ...recipe, cookbookId: cookbookId.value || recipe.cookbookId || '' });
     await router.push(newRecipeRoute.value);
   } catch (err) {
+    console.error('[recipe-import] Import failed.', {
+      message: err?.message,
+      hasText: Boolean(text.value.trim()),
+      textLength: text.value.length,
+      hasImage: Boolean(imageData.value),
+      imageName: imageName.value || undefined,
+    });
     error.value = err?.message || 'Unable to import recipe.';
   } finally {
     loading.value = false;

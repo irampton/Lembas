@@ -267,6 +267,13 @@ app.post("/api/llm-import", auth.requireAuth, async (req, res) => {
     res.json({ success: true, data: recipe });
   } catch (error) {
     console.error("[llm] import failed:", error);
+    if (error?.code === "EMPTY_LLM_RECIPE") {
+      res.status(422).json({
+        success: false,
+        error: "The LLM returned an empty recipe. Try again with more complete recipe text or a clearer image.",
+      });
+      return;
+    }
     res.status(500).json({ success: false, error: "Unable to import recipe right now." });
   }
 });
