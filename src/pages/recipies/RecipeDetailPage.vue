@@ -145,6 +145,8 @@
                     </div>
                     <div class="lg:min-w-30">
                       <RecipeIngredientHover :quantity="hoverQuantity(ingredient)" :unit="ingredient.unit"
+                        :display-quantity="scaledIngredient(ingredient).quantity"
+                        :display-unit="scaledIngredient(ingredient).unit"
                         :ingredient-name="ingredient.name"
                         :unit-system="selectedUnitSystem"
                         :written-unit="formatUnit(ingredient.unit, hoverQuantity(ingredient))" side-placement
@@ -318,7 +320,7 @@ import BaseLoadingSpinner from "../../baseComponents/BaseLoadingSpinner.vue";
 import RecipeIngredientHover from "../../shared/RecipeIngredientHover.vue";
 import { useAuthStore } from "../../stores/authStore.js";
 import { useRecipeStore } from "../../stores/recipeStore.js";
-import { convertIngredientUnit, formatMilliliters, formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
+import { convertIngredientUnit, formatMetricQuantity, formatUnit, getUnit, parseQuantity } from "../../mixins/units.js";
 
 const store = useRecipeStore();
 const auth = useAuthStore();
@@ -702,33 +704,37 @@ const formatQuantity = (amount) => {
   return `${Math.round(amount * 100) / 100}`;
 };
 
+const CUSTOMARY_VOLUME_INCREMENTS = Object.freeze({
+  cup: [1 / 8, 1 / 3],
+  tbsp: [1 / 2],
+  tsp: [1 / 8, 1 / 3],
+});
+
+const nearestCustomaryVolume = (amount) => {
+  const candidates = [
+    ["cup", 236.5882365], ["tbsp", 14.78676478125], ["tsp", 4.92892159375],
+  ].flatMap(([unit, factor]) => CUSTOMARY_VOLUME_INCREMENTS[unit].map((increment) => {
+    const quantity = Math.round((amount / factor) / increment) * increment;
+    return { unit, factor, quantity, difference: Math.abs(amount - quantity * factor) };
+  })).filter(({ quantity }) => quantity > 0);
+  return candidates.reduce((closest, candidate) =>
+    !closest || candidate.difference < closest.difference - 0.000001
+      || (Math.abs(candidate.difference - closest.difference) <= 0.000001 && candidate.factor > closest.factor)
+      ? candidate
+      : closest,
+  null);
+};
+
 const readableVolume = (amount) => {
   // Recipe quantities stay in familiar cups below a gallon. Quarts are useful
   // for one to three gallons; above that, gallons are easier to scan.
   const targets = [
     ["gal", 3785.411784, 3], ["qt", 946.352946, 4],
-    ["cup", 236.5882365, 1 / 8], ["tbsp", 14.78676478125, 1 / 2],
-    ["tsp", 4.92892159375, 0],
   ];
-  return targets.find(([, milliliters, minimum]) => amount / milliliters >= minimum) || targets.at(-1);
-};
-
-const CUSTOMARY_VOLUME_INCREMENTS = Object.freeze({
-  cup: [1 / 8, 1 / 6],
-  tbsp: [1 / 2],
-  tsp: [1 / 16, 1 / 6],
-});
-
-const roundToNearestMultiple = (amount, increments) => increments
-  .map((increment) => Math.round(amount / increment) * increment)
-  .reduce((closest, candidate) =>
-    Math.abs(amount - candidate) < Math.abs(amount - closest) ? candidate : closest,
-  );
-
-const formatCustomaryVolume = (amount, unit) => {
-  const increments = CUSTOMARY_VOLUME_INCREMENTS[unit];
-  const roundedAmount = increments ? roundToNearestMultiple(amount, increments) : amount;
-  return formatQuantity(roundedAmount);
+  const largerUnit = targets.find(([, milliliters, minimum]) => amount / milliliters >= minimum);
+  if (largerUnit) return largerUnit;
+  const closest = nearestCustomaryVolume(amount);
+  return closest && [closest.unit, closest.factor, closest.quantity];
 };
 
 const setShareHistory = async (enabled) => {
@@ -752,15 +758,7 @@ const setShareHistory = async (enabled) => {
   }
 };
 
-const formatMetricQuantity = (amount, unit) => {
-  if (unit === "ml" || unit === "g") return formatMilliliters(amount);
-  if (unit === "l" || unit === "kg") {
-    const decimalPlaces = amount < 10 ? 3 : 2;
-    const precision = 10 ** decimalPlaces;
-    return `${Math.round(amount * precision) / precision}`;
-  }
-  return `${Math.round(amount * 100) / 100}`;
-};
+const formatMetricDisplay = (amount) => formatMetricQuantity(amount);
 
 const readableCustomaryUnit = (amount, dimension) => {
   if (dimension === "volume") return readableVolume(amount);
@@ -781,7 +779,9 @@ const readableMetricUnit = (amount, dimension) => {
 const scaledIngredient = (ingredient) => {
   const original = ingredient.quantity?.toString?.().trim() || "";
   const mode = showAsWritten.value ? null : unitSystem.value || detectedUnitSystem.value;
-  if (multiplier.value === 1 && !mode) {
+  // Until a unit button is explicitly selected, an unscaled recipe is a
+  // transcription: preserve its authored quantity and unit verbatim.
+  if (multiplier.value === 1 && !unitSystem.value) {
     return { quantity: original, unit: formatUnit(ingredient.unit, original) };
   }
   const amount = parseQuantity(original);
@@ -802,12 +802,12 @@ const scaledIngredient = (ingredient) => {
       const quantity = formatQuantity(scaledAmount);
       return { quantity, unit: formatUnit(ingredient.unit, quantity) };
     }
-    const [unit, factor] = target;
+    const [unit, factor, roundedQuantity] = target;
     const convertedAmount = baseAmount / factor;
     const quantity = metric
-      ? formatMetricQuantity(convertedAmount, unit)
+      ? formatMetricDisplay(convertedAmount, unit)
       : targetDimension === "volume"
-        ? formatCustomaryVolume(convertedAmount, unit)
+        ? formatQuantity(roundedQuantity ?? convertedAmount)
         : formatQuantity(convertedAmount);
     return { quantity, unit: formatUnit(unit, quantity) };
   }

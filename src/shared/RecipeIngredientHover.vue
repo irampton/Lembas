@@ -24,11 +24,15 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BaseFloatingBox from "../baseComponents/BaseFloatingBox.vue";
-import { convertIngredientUnit, formatMilliliters, getIngredientDensity, getUnit, parseQuantity } from "../mixins/units.js";
+import { convertIngredientUnit, formatMetricQuantity, getIngredientDensity, getUnit, parseQuantity } from "../mixins/units.js";
 
 const props = defineProps({
   quantity: { type: [String, Number], default: "" },
   unit: { type: String, default: "" },
+  // RecipeDetailPage supplies these when its ingredient row has applied a
+  // multiplier or unit conversion. The heading must mirror that row exactly.
+  displayQuantity: { type: [String, Number], default: "" },
+  displayUnit: { type: String, default: "" },
   writtenUnit: { type: String, default: "" },
   ingredientName: { type: String, default: "" },
   unitSystem: { type: String, default: "" },
@@ -63,7 +67,7 @@ const fractions = Object.freeze({
   "1/5": "⅕", "2/5": "⅖", "3/5": "⅗", "4/5": "⅘", "1/6": "⅙",
   "5/6": "⅚", "1/8": "⅛", "3/8": "⅜", "5/8": "⅝", "7/8": "⅞",
 });
-const fractionDenominators = [2, 3, 4, 5, 6, 8];
+const fractionDenominators = [2, 3, 4, 5, 6, 8, 16];
 
 const formatAmount = (value) => {
   if (!Number.isFinite(value)) return "";
@@ -80,9 +84,26 @@ const formatAmount = (value) => {
   if (closest?.difference < 0.035) {
     const fraction = fractions[`${closest.numerator}/${closest.denominator}`];
     if (fraction) return whole ? `${whole}${fraction}` : fraction;
+    return whole ? `${whole} ${closest.numerator}/${closest.denominator}` : `${closest.numerator}/${closest.denominator}`;
   }
   if (Math.abs(remainder) < 0.000001) return `${whole}`;
   return `${Math.round(value * 100) / 100}`;
+};
+const POPUP_CUP_INCREMENTS = [1 / 16, 1 / 6];
+const METRIC_UNITS = new Set(["mg", "g", "kg", "ml", "cl", "dl", "l"]);
+const isExactPopupCupAmount = (amount) => POPUP_CUP_INCREMENTS.some((increment) =>
+  Math.abs(amount - Math.round(amount / increment) * increment) < 0.000001,
+);
+const roundPopupCupAmount = (amount) => POPUP_CUP_INCREMENTS
+  .map((increment) => Math.round(amount / increment) * increment)
+  .reduce((closest, candidate) =>
+    Math.abs(amount - candidate) < Math.abs(amount - closest) ? candidate : closest,
+  );
+const formatPopupAmount = (amount, unit) => {
+  if (METRIC_UNITS.has(unit)) return formatMetricQuantity(amount);
+  if (unit !== "cup") return formatAmount(amount);
+  if (amount < 1) return isExactPopupCupAmount(amount) ? formatAmount(amount) : null;
+  return formatAmount(roundPopupCupAmount(amount));
 };
 
 const conversions = computed(() => {
@@ -98,11 +119,11 @@ const conversions = computed(() => {
         label,
         dimension: target.dimension,
         system: customaryUnits.has(target.value) ? "customary" : "metric",
-        amount: unit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
+        amount: formatPopupAmount(convertedAmount, unit),
         convertedAmount,
       };
     })
-    .filter(({ convertedAmount }) => convertedAmount >= 1 / 8);
+    .filter(({ convertedAmount, amount }) => convertedAmount >= 1 / 8 && amount !== null);
 });
 const massVolumeConversions = computed(() => {
   if (!definition.value?.conversion || !Number.isFinite(amount.value) || !getIngredientDensity(props.ingredientName)) return [];
@@ -118,10 +139,10 @@ const massVolumeConversions = computed(() => {
       label,
       dimension: getUnit(unit).dimension,
       system: customaryUnits.has(unit) ? "customary" : "metric",
-      amount: unit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
+      amount: formatPopupAmount(convertedAmount, unit),
       convertedAmount,
     };
-  }).filter(({ convertedAmount }) => Number.isFinite(convertedAmount) && convertedAmount >= 1 / 8);
+  }).filter(({ convertedAmount, amount }) => Number.isFinite(convertedAmount) && convertedAmount >= 1 / 8 && amount !== null);
 });
 const customaryUnits = new Set(["tsp", "tbsp", "cup", "pt", "qt", "gal", "fl oz", "lb", "oz"]);
 const selectorTargets = Object.freeze({
@@ -145,32 +166,38 @@ const selectorConversion = computed(() => {
     convertedAmount = convertIngredientUnit(amount.value, definition.value.value, targetUnit, props.ingredientName);
   }
   const target = getUnit(targetUnit);
+  const displayAmount = formatPopupAmount(convertedAmount, targetUnit);
+  if (displayAmount === null) return null;
   return {
     unit: `selected-${targetUnit}`,
     targetUnit,
     label: target.abbreviation,
     dimension: target.dimension,
     system: customaryUnits.has(targetUnit) ? "customary" : "metric",
-    amount: targetUnit === "ml" ? formatMilliliters(convertedAmount) : formatAmount(convertedAmount),
+    amount: displayAmount,
     convertedAmount,
     selected: true,
   };
 });
-const primaryQuantity = computed(() => selectorConversion.value?.amount || props.quantity);
-const primaryUnit = computed(() => selectorConversion.value?.label || props.writtenUnit || props.unit);
+const hasDisplayValue = computed(() => props.displayQuantity !== "" && props.displayQuantity !== null);
+const primaryQuantity = computed(() => hasDisplayValue.value ? props.displayQuantity : selectorConversion.value?.amount || props.quantity);
+const primaryUnit = computed(() => hasDisplayValue.value ? props.displayUnit : selectorConversion.value?.label || props.writtenUnit || props.unit);
+const primaryTargetUnit = computed(() => getUnit(props.displayUnit)?.value || selectorConversion.value?.targetUnit || definition.value?.value);
 const originalUnitConversion = computed(() => {
   // The source measurement is represented by the heading when no mode is
   // selected. Once a mode is selected, retain it in its natural group unless
   // the heading already represents that exact unit.
   if (!props.unitSystem || !definition.value?.conversion || !Number.isFinite(amount.value)
     || !['mass', 'volume'].includes(definition.value.dimension)) return null;
+  const displayAmount = formatPopupAmount(amount.value, definition.value.value);
+  if (displayAmount === null) return null;
   return {
     unit: `original-${definition.value.value}`,
     targetUnit: definition.value.value,
     label: definition.value.abbreviation,
     dimension: definition.value.dimension,
     system: customaryUnits.has(definition.value.value) ? "customary" : "metric",
-    amount: definition.value.value === "ml" ? formatMilliliters(amount.value) : formatAmount(amount.value),
+    amount: displayAmount,
     convertedAmount: amount.value,
   };
 });
@@ -196,16 +223,9 @@ const allConversions = computed(() => {
       (order.get(`${left.system}-${left.dimension}`) ?? 99) -
       (order.get(`${right.system}-${right.dimension}`) ?? 99))
     .filter((conversion) => {
-      // The bold heading is the active selector's conversion, so never repeat
-      // that exact unit in the detail list.
-      if (selectorConversion.value && conversion.targetUnit === selectorConversion.value.targetUnit) return false;
-      // When the heading promotes mL/g to L/kg, it still represents the
-      // selector's metric volume/weight result rather than another category.
-      if (selectorConversion.value?.targetUnit === "l" && conversion.targetUnit === "ml") return false;
-      if (selectorConversion.value?.targetUnit === "kg" && conversion.targetUnit === "g") return false;
-      // In ounce mode the heading is the customary-weight reference; pounds
-      // are only useful beneath it when the heading itself has promoted to lb.
-      if (selectorConversion.value?.targetUnit === "oz" && conversion.targetUnit === "lb") return false;
+      // The bold heading is the ingredient-row value, so no detail row may
+      // repeat its unit.
+      if (conversion.targetUnit === primaryTargetUnit.value) return false;
       if (uniqueTargets.has(conversion.targetUnit)) return false;
       uniqueTargets.add(conversion.targetUnit);
       return true;

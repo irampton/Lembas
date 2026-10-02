@@ -258,30 +258,18 @@ export const formatUnit = (value, quantity) => {
   return definition.abbreviation;
 };
 
-// Keep small metric volumes legible without suggesting more precision than a
-// kitchen measure can provide. The selected fractional cooking measures are
-// displayed as decimals, capped at two places.
-export const formatMilliliters = (amount) => {
+// Metric measurements are always decimal values. Keep small measurements
+// legible without suggesting more precision than a kitchen measure provides.
+export const formatMetricQuantity = (amount) => {
   if (!Number.isFinite(amount)) return '';
   const formatDecimal = (value) => `${Math.round(value * 100) / 100}`;
-  if (amount >= 20) return formatDecimal(Math.round(amount));
-  if (amount >= 10) return formatDecimal(Math.round(amount * 2) / 2);
-
-  const whole = Math.floor(amount);
-  const candidates = [
-    whole,
-    whole + 1 / 4,
-    whole + 1 / 3,
-    whole + 1 / 2,
-    whole + 2 / 3,
-    whole + 3 / 4,
-    whole + 1,
-  ];
-  const rounded = candidates.reduce((closest, candidate) =>
-    Math.abs(amount - candidate) <= Math.abs(amount - closest) ? candidate : closest,
-  );
-  return formatDecimal(rounded);
+  if (amount >= 100) return formatDecimal(Math.round(amount));
+  if (amount >= 20) return formatDecimal(Math.round(amount * 2) / 2);
+  return formatDecimal(Math.round(amount * 4) / 4);
 };
+
+// Kept as a compatibility alias for existing volume call sites.
+export const formatMilliliters = formatMetricQuantity;
 
 export const convertUnit = (quantity, fromValue, toValue) => {
   const from = getUnit(fromValue);
@@ -300,6 +288,7 @@ export default {
   methods: {
     formatUnit,
     formatMilliliters,
+    formatMetricQuantity,
     convertUnit,
     normalizeUnit,
   },
